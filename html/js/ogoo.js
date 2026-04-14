@@ -766,8 +766,12 @@ $(async function() {
         } else {
             var current_account = accounts[0];
             var balance = await provider.getBalance(current_account.address);
-            $('.nav-current-account').text(current_account.address);
-            $('.nav-current-amount').text(ethers.formatEther(balance) + ethers.EtherSymbol);
+            var addr = current_account.address;
+            $('.nav-current-account').text(addr.slice(0, 6) + '...' + addr.slice(-4));
+            $('.nav-current-account').attr('title', addr);
+            var balanceEther = parseFloat(ethers.formatEther(balance));
+            $('.nav-current-amount').text(balanceEther.toFixed(4) + ethers.EtherSymbol);
+            $('.nav-current-amount').attr('title', ethers.formatEther(balance) + ethers.EtherSymbol);
 
             await onhashchange();
             await fill_offer_lists();
