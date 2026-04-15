@@ -327,7 +327,7 @@ $(async function() {
 
     const get_database = async function() {
         return await new Promise(function(resolve, reject) {
-            var request = indexedDB.open('ogoo', 1);
+            var request = indexedDB.open('ogoo.v.2', 1);
             request.onerror = (ex) => {
                 console.error('Error open ogoo database', ex);
                 bootstrap.Modal.getOrCreateInstance($('#no-database')[0], {
@@ -625,6 +625,8 @@ $(async function() {
                 observing_list_row.find('.offer-title').text(offer_record.definition.caption);
                 observing_list_row.find('.offer-contribution').text(etherFormatApprox(offer_record.contribution));
                 observing_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ethers.EtherSymbol);
+                observing_list_row.find('.offer-balance').text(etherFormatApprox(offer_record.amount));
+                observing_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ethers.EtherSymbol);
                 if(offer_record.state != 1n) {
                     observing_list_row.find('.observer-vote-button').addClass('disabled');
                 }
@@ -767,10 +769,10 @@ $(async function() {
             var current_account = accounts[0];
             var balance = await provider.getBalance(current_account.address);
             var addr = current_account.address;
-            $('.nav-current-account').text(addr.slice(0, 6) + '...' + addr.slice(-4));
+            $('.nav-current-account').text(addr);
             $('.nav-current-account').attr('title', addr);
             var balanceEther = parseFloat(ethers.formatEther(balance));
-            $('.nav-current-amount').text(balanceEther.toFixed(4) + ethers.EtherSymbol);
+            $('.nav-current-amount').text(balanceEther + ethers.EtherSymbol);
             $('.nav-current-amount').attr('title', ethers.formatEther(balance) + ethers.EtherSymbol);
 
             await onhashchange();

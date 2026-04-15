@@ -95,47 +95,6 @@ For testing, you can use any of the listed accounts. They are pre-funded with te
 
 **Note:** The HardHat node resets its blockchain state every time it restarts. All accounts and contracts will be reset.
 
-### Configure Your MetaMask Wallet
-
-You need to connect MetaMask to your local test network.
-
-#### Connect MetaMask to the Local HardHat Network
-
-To connect MetaMask to your local HardHat network:
-
-1. Open MetaMask and click the network dropdown at the top.
-2. Select **Add network** (or **Add network manually**).
-3. Enter the following details:
-    - **Network Name:** HardHat Localhost
-    - **New RPC URL:** http://127.0.0.1:8545/
-    - **Chain ID:** 31337
-    - **Currency Symbol:** ETH
-    - **Block Explorer URL:** (leave blank)
-4. Click **Save**.
-
-MetaMask will now use your local HardHat node as the network.
-
-*Notice*: The modern MetaMask may need a little bit another procedure to add a local network.
-It can be proceed only when you open the site, see below.
-
-#### Import a Test Account into MetaMask
-
-To use one of the HardHat test accounts in MetaMask:
-
-1. In the HardHat node output, copy the **private key** of the account you want to use.
-2. Open MetaMask and click your account icon (at the top center of the MetaMask interface).
-3. Select **Add Account**.
-4. Choose **From Private Key**.
-5. Paste the copied private key into the field.
-6. Click **Import**.
-
-The test account will now appear in your MetaMask wallet, and you can use its pre-funded test ETH for transactions.
-
-Make sure to select the _test network_ as your current network, and your _test account_ as your current account (dropdown at the top center of MetaMask). You should see your test account pre-funded with 10000 ETH. If the balance does not appear immediately, try switching networks in MetaMask.
-
-- In the oldest versions of MetaMask, the _network_ is switched globally using dropdown in the top left corner of MetaMask
-- In the modern versions of MetaMask, the _network_ is switched **individually** for the application, clicking the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
-
 ## Go to the Site
 
 The published version is available on the [OGOO site](https://ogoo.io).
@@ -228,10 +187,11 @@ If everything is set up correctly, you will see your account number and ETH bala
 
 ### Modern MetaMask testing network connection
 
-On the modern version of the MetaMask you will probably need to add and select the testing Ethereum network.
-Open the MetaMask plugin and click the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
+On the modern versions of the MetaMask you will need to add and select the testing Ethereum network for the particular site (`ogoo.io` or `ogoo.local`).
 
-You will see the site name (ogoo.local) and an active (blue) link to the network directly below. Click this link.
+Open the `ogoo.io` or `ogoo.local` site, and connect the MetaMask wallet if not yet. Open the MetaMask plugin and click the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
+
+You will see the site name (`ogoo.io` or `ogoo.local`) and an active (blue) link to the network directly below. Click this link.
 
 You will see the "Network Management" list where all available networks are listed. The "Add Custom Network" button
 should be present below the list. Click it if you don't see your custom network in a list yet, and input the
@@ -245,7 +205,39 @@ following values into the input fields:
 
 Ensure that the "HardHat Localhost" is an active element in the list.
 
-Now you are ready to walk through the application.
+### Older MetaMask testing network connection
+
+On the older versions of the MetaMask you will need to add and select the testing Ethereum network for all sites.
+
+1. Open MetaMask and click the network dropdown at the top.
+2. Select **Add network** (or **Add network manually**).
+3. Enter the following details:
+    - **Network Name:** HardHat Localhost
+    - **New RPC URL:** http://127.0.0.1:8545/
+    - **Chain ID:** 31337
+    - **Currency Symbol:** ETH
+    - **Block Explorer URL:** (leave blank)
+4. Click **Save**.
+
+MetaMask will now use your local HardHat node as the network.
+
+#### Import a Test Account into MetaMask
+
+To use one of the HardHat test accounts in MetaMask:
+
+1. In the HardHat node output, copy the **private key** of the account you want to use.
+2. Open MetaMask and click your account icon (at the top center of the MetaMask interface).
+3. Select **Add Account**.
+4. Choose **From Private Key**.
+5. Paste the copied private key into the field.
+6. Click **Import**.
+
+The test account will now appear in your MetaMask wallet, and you can use its pre-funded test ETH for transactions.
+
+Make sure to select the _test network_ as your current network, and your _test account_ as your current account (dropdown at the top center of MetaMask). You should see your test account pre-funded with 10000 ETH. If the balance does not appear immediately, try switching networks in MetaMask.
+
+- In the oldest versions of MetaMask, the _network_ is switched globally using dropdown in the top left corner of MetaMask
+- In the modern versions of MetaMask, the _network_ is switched **individually** for the application, clicking the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
 
 ## Offer Operations
 
