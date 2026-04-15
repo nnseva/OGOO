@@ -7,6 +7,7 @@
 - [Offer Definition](OfferDefinition.md)
 - [Offer Contract API](OfferContractAPI.md) ⏴ *this page*
 - [How To Test](HOWTOTEST.md)
+- [User Guide](html/USER-GUIDE.en.md) [ru](html/USER-GUIDE.ru.md)
 
 ## 📖 Introduction
 

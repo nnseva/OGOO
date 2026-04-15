@@ -7,6 +7,7 @@
 - [Offer Definition](OfferDefinition.md)
 - [Offer Contract API](OfferContractAPI.md)
 - [How To Test](HOWTOTEST.md) ⏴ *this page*
+- [User Guide](html/USER-GUIDE.en.md) [ru](html/USER-GUIDE.ru.md)
 
 ## Install a Wallet
 
