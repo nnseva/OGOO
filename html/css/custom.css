@@ -373,3 +373,11 @@ section {
 .fs-09 {
     font-size: 0.9rem;
 }
+
+/* Bootstrap fix for invalid-feedback inside input-group */
+.was-validated .form-check:has(:invalid) .invalid-feedback {
+    display: block;
+}
+.was-validated .form-check:not(:has(:invalid)) .valid-feedback {
+    display: block;
+}

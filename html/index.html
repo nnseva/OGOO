@@ -521,10 +521,9 @@
                   <div class="form-check col col-12">
                     <div class="input-group">
                     <input type="text" class="form-control input-caption" placeholder="Caption" data-t="input-caption" required></input>
-                    <div class="invalid-tooltip" data-t="input-caption-invalid-feedback">
-                      Caption should not be empty
                     </div>
-                    <span class="input-group-text"></span> <!-- correctly closes input view to the right, TODO: make unnecessary using CSS -->
+                    <div class="invalid-feedback" data-t="input-caption-invalid-feedback">
+                      Caption should not be empty
                     </div>
                     <div class="form-text" data-t="input-caption-form-text">Short one-line caption of the offer</div>
                   </div>
@@ -532,12 +531,12 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="text" class="form-control w-50 input-contribution-min-balance" data-t="input-contribution-min-balance" placeholder="Min contribution" pattern="[0-9]+(\.[0-9]{1,3})?" required>
-                        <div class="invalid-tooltip" data-t="input-contribution-min-balance-invalid-feedback">
-                            Input value ≥ 0, no more than 3 decimal digits
-                        </div>
                         <input type="hidden" class="select-value"> 
                         <select class="form-select input-group-text input-amount-unit" size style="width:100px;" data-t="input-amount-unit" aria-label="Min contribution units">
                         </select>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-contribution-min-balance-invalid-feedback">
+                        Input value ≥ 0, no more than 3 decimal digits
                     </div>
                     <div class="form-text" data-t="input-contribution-min-balance-form-text">Minimal contribution balance to make the contribution</div>
                   </div>
@@ -545,12 +544,12 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-contribution-unlock-timeout" data-t="input-contribution-unlock-timeout" placeholder="Cancel timeout" min="0" step="0.1" required>
-                        <div class="invalid-tooltip" data-t="input-contribution-unlock-timeout-invalid-feedback">
-                            Input value ≥ 0, no more than 1 decimal digit
-                        </div>
                         <input type="hidden" class="select-value"> 
                         <select class="form-select input-group-text input-timeout-unit" data-t="input-timeout-unit" size style="width:100px;" aria-label="Timeout units">
                         </select>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-contribution-unlock-timeout-invalid-feedback">
+                        Input value ≥ 0, no more than 1 decimal digit
                     </div>
                     <div class="form-text" data-t="input-contribution-unlock-timeout-form-text">Timeout to unlock an individual contribution to return to the contributor</div>
                   </div>
@@ -558,12 +557,12 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="text" class="form-control w-50 input-voting-start-balance" data-t="input-voting-start-balance" placeholder="Voting start balance" pattern="[0-9]+(\.[0-9]{1,3})?" required>
-                        <div class="invalid-tooltip" data-t="input-voting-start-balance-invalid-feedback">
-                            Input value ≥ 0, no more than 3 decimal digits
-                        </div>
                         <input type="hidden" class="select-value">
                         <select class="form-select input-group-text input-amount-unit" size style="width:100px;" data-t="input-amount-unit" aria-label="Balance units">
                         </select>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-voting-start-balance-invalid-feedback">
+                        Input value ≥ 0, no more than 3 decimal digits
                     </div>
                     <div class="form-text" data-t="input-voting-start-balance-form-text">Minimal balance of the active contributors to start voting</div>
                   </div>
@@ -571,10 +570,9 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-voting-start-count" data-t="input-voting-start-count" placeholder="Voting start count" min="0" step="1" required>
-                        <div class="invalid-tooltip" data-t="input-voting-start-count-invalid-feedback">
-                            Input integer value ≥ 0
-                        </div>
-                        <span class="input-group-text"></span> <!-- correctly closes input view to the right, TODO: make unnecessary using CSS -->
+                    </div>
+                    <div class="invalid-feedback" data-t="input-voting-start-count-invalid-feedback">
+                        Input integer value ≥ 0
                     </div>
                     <div class="form-text" data-t="input-voting-start-count-form-text">Minimal number of the active contributors to start voting</div>
                   </div>
@@ -582,12 +580,12 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-voting-start-timeout" data-t="input-voting-start-timeout" placeholder="Voting start timeout" min="0" step="0.1" required>
-                        <div class="invalid-tooltip" data-t="input-voting-start-timeout-invalid-feedback">
-                        Input value ≥ 0, no more than 1 decimal digit
-                        </div>
                         <input type="hidden" class="select-value"> 
                         <select class="form-select input-group-text input-timeout-unit" size style="width:100px;" data-t="input-timeout-unit" aria-label="Timeout units">
                         </select>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-voting-start-timeout-invalid-feedback">
+                        Input value ≥ 0, no more than 1 decimal digit
                     </div>
                     <div class="form-text" data-t="input-voting-start-timeout-form-text">The offer should exceed minimal voting bounds after approve within this timeout, or the offer has failed</div>
                   </div>
@@ -595,12 +593,12 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-voting-fail-timeout" data-t="input-voting-fail-timeout" placeholder="Voting fail timeout" min="0" step="0.1" required>
-                        <div class="invalid-tooltip" data-t="input-voting-fail-timeout-invalid-feedback">
-                        Input value ≥ 0, no more than 1 decimal digit
-                        </div>
                         <input type="hidden" class="select-value"> 
                         <select class="form-select input-group-text input-timeout-unit" size style="width:100px;" data-t="input-voting-fail-timeout-unit" aria-label="Timeout units">
                         </select>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-voting-fail-timeout-invalid-feedback">
+                        Input value ≥ 0, no more than 1 decimal digit
                     </div>
                     <div class="form-text" data-t="input-voting-fail-timeout-form-text">The offer voting should be completed after approve within this timeout, or the offer has failed</div>
                   </div>
@@ -608,10 +606,10 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-observers-vote-quorum" data-t="input-observers-vote-quorum" placeholder="Observers count %" min="0" max="100" step="0.01" required>
-                        <div class="invalid-tooltip" data-t="input-observers-vote-quorum-invalid-feedback">
-                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
-                        </div>
                         <span class="input-group-text">%</span>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-observers-vote-quorum-invalid-feedback">
+                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
                     </div>
                     <div class="form-text" data-t="input-observers-vote-quorum-form-text">Observers vote quorum (% of observers). Zero means voting per total available</div>
                   </div>
@@ -619,10 +617,10 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-contributors-vote-quorum" data-t="input-contributors-vote-quorum" placeholder="Contributors count %" min="0" max="100" step="0.01" required>
-                        <div class="invalid-tooltip" data-t="input-contributors-vote-quorum-invalid-feedback">
-                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
-                        </div>
                         <span class="input-group-text">%</span>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-contributors-vote-quorum-invalid-feedback">
+                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
                     </div>
                     <div class="form-text" data-t="input-contributors-vote-quorum-form-text">Contributors vote quorum (% of contributors). Zero means voting per total available</div>
                   </div>
@@ -630,10 +628,10 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-contributors-vote-fund-quorum" data-t="input-contributors-vote-fund-quorum" placeholder="Contributors fund %" min="0" max="100" step="0.01" required>
-                        <div class="invalid-tooltip" data-t="input-contributors-vote-fund-quorum-invalid-feedback">
-                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
-                        </div>
                         <span class="input-group-text">%</span>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-contributors-vote-fund-quorum-invalid-feedback">
+                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
                     </div>
                     <div class="form-text" data-t="input-contributors-vote-fund-quorum-form-text">Contributors vote fund quorum (% of contributor funds). Zero means voting per total available</div>
                   </div>
@@ -641,10 +639,10 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-observers-vote-percent" data-t="input-observers-vote-percent" placeholder="Observers vote count %" min="0" max="100" step="0.01" required>
-                        <div class="invalid-tooltip" data-t="input-observers-vote-percent-invalid-feedback">
-                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
-                        </div>
                         <span class="input-group-text">%</span>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-observers-vote-percent-invalid-feedback">
+                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
                     </div>
                     <div class="form-text" data-t="input-observers-vote-percent-form-text">Observers vote percent (% of votes count) to agree the observer's vote</div>
                   </div>
@@ -652,10 +650,10 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-contributors-vote-percent" data-t="input-contributors-vote-percent" placeholder="Contributors vote count %" min="0" max="100" step="0.01" required>
-                        <div class="invalid-tooltip" data-t="input-contributors-vote-percent-invalid-feedback">
-                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
-                        </div>
                         <span class="input-group-text">%</span>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-contributors-vote-percent-invalid-feedback">
+                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
                     </div>
                     <div class="form-text" data-t="input-contributors-vote-percent-form-text">Contributors vote percent (% of votes count) to agree the contributor's vote</div>
                   </div>
@@ -663,10 +661,10 @@
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
                         <input type="number" class="form-control w-50 input-contributors-vote-fund-percent" data-t="input-contributors-vote-fund-percent" placeholder="Contributors vote fund %" min="0" max="100" step="0.01" required>
-                        <div class="invalid-tooltip" data-t="input-contributors-vote-fund-percent-invalid-feedback">
-                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
-                        </div>
                         <span class="input-group-text">%</span>
+                    </div>
+                    <div class="invalid-feedback" data-t="input-contributors-vote-fund-percent-invalid-feedback">
+                        Input value ≤ 100, ≥ 0, no more than 2 decimal digits
                     </div>
                     <div class="form-text" data-t="input-contributors-vote-fund-percent-form-text">Contributors vote fund percent (% of voting amount) to agree the contributor's vote</div>
                   </div>

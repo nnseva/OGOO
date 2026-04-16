@@ -102,29 +102,15 @@ The published version is available on the [OGOO site](https://ogoo.io).
 
 A non-published version should be tested on *your own* site deployment.
 
-### Local site preparation
-
-Use `git` to clone the source of the package
-
-```bash
-git clone git@github.com:nnseva/OGOO.git
-cd OGOO
-```
-
-Use `Node.js` to prepare a site.
-
-```bash
-
-npm install
-npx solt pp templates/ogoo.solt -o contracts/ogoo.sol
-npx hardhat compile
-```
-
-### Local site deployment
+### Local HTTP server deployment
 
 You can use Apache or Nginx to create your own site on the localhost. This site is totally static.
 
-For example, the following config allowes to deploy a site locally on the Linux host using the Apache2 server:
+#### Apache2 software configuration
+
+Install the Apache2 software if necessary.
+
+The following config allowes to deploy a site locally using your `/home/<username>/OGOO` directory on the Linux (or MacOS) host with the Apache2 server (**notice** that the directory structure may differ on Linux and MacOS hosts, here is a Linux configuration example).
 
 `/etc/apache2/sites-available/003-ogoo.conf`
 ```
@@ -166,6 +152,29 @@ row into your `/etc/hosts` file:
 127.0.0.1 ogoo.local
 ```
 
+### Local site preparation
+
+Use `git` to clone the source of the package
+
+```bash
+# go to the home directory
+cd
+# clone the repository
+git clone git@github.com:nnseva/OGOO.git
+cd OGOO
+# use the necessary branch
+git checkout "<name-of-the-branch>"
+```
+
+Use `Node.js` to prepare a site.
+
+```bash
+
+npm install
+npx solt pp templates/ogoo.solt -o contracts/ogoo.sol
+npx hardhat compile
+```
+
 ### Browser hack for the local site
 
 The local site is HTTP, not HTTPS. The modern browsers forbid using the camera on the HTTP site. The OGOO site may use the camera to scan QR codes with accounts.
@@ -182,6 +191,8 @@ Input `http://ogoo.local` into the input field.
 
 ## Open the site
 
+Open the `http://ogoo.local` if you use a local site. The public site is `https://ogoo.io`.
+
 The site will prompt you to connect your MetaMask wallet. Follow the instructions.
 
 If everything is set up correctly, you will see your account number and ETH balance displayed under the site’s top menu. The wallet selector in the top right corner should show the MetaMask icon and name.
@@ -190,7 +201,7 @@ If everything is set up correctly, you will see your account number and ETH bala
 
 On the modern versions of the MetaMask you will need to add and select the testing Ethereum network for the particular site (`ogoo.io` or `ogoo.local`).
 
-Open the `ogoo.io` or `ogoo.local` site, and connect the MetaMask wallet if not yet. Open the MetaMask plugin and click the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
+Open the `https://ogoo.io` or `http://ogoo.local` site, and connect the MetaMask wallet if not yet. Open the MetaMask plugin and click the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
 
 You will see the site name (`ogoo.io` or `ogoo.local`) and an active (blue) link to the network directly below. Click this link.
 
@@ -205,6 +216,8 @@ following values into the input fields:
     - **Block Explorer URL:** (leave blank)
 
 Ensure that the "HardHat Localhost" is an active element in the list.
+
+You also may need to select the `HardHat Localhost` network in the `Tokens` list. 
 
 ### Older MetaMask testing network connection
 
@@ -239,6 +252,7 @@ Make sure to select the _test network_ as your current network, and your _test a
 
 - In the oldest versions of MetaMask, the _network_ is switched globally using dropdown in the top left corner of MetaMask
 - In the modern versions of MetaMask, the _network_ is switched **individually** for the application, clicking the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
+- You also may need to select the `HardHat Localhost` network in the `Tokens` list. 
 
 ## Offer Operations
 

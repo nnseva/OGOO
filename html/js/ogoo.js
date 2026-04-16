@@ -26,6 +26,20 @@ $(async function() {
         'T' + ethers.EtherSymbol,
     ]
 
+    const etherUnitNames = createMap(
+        WeiSymbol, 'Wei',
+        'K' + WeiSymbol, 'KiloWei',
+        'M' + WeiSymbol, 'MegaWei',
+        'G' + WeiSymbol, 'GigaWei',
+        'mk' + ethers.EtherSymbol, 'MicroEther',
+        'm' + ethers.EtherSymbol, 'MilliEther',
+        ethers.EtherSymbol, 'Ether',
+        'K' + ethers.EtherSymbol, 'KiloEther',
+        'M' + ethers.EtherSymbol, 'MegaEther',
+        'G' + ethers.EtherSymbol, 'GigaEther',
+        'T' + ethers.EtherSymbol, 'TeraEther'
+    );
+
     const timeUnits = {
         'sec': 1,
         'min': 60,
@@ -126,6 +140,16 @@ $(async function() {
         }
         return ret;
     };
+
+    const shortenedAddress = function(address) {
+        return address.substr(0, 6) + '...' + address.substr(-4);
+    }
+
+    const roundedAmount = function(amount, decimals=4) {
+        var splitted = bigIntSplit(amount, 1);
+        splitted = bigIntSplitRound(splitted, splitted.length - decimals, 1);
+        return bigIntUnsplit(splitted, 1);
+    }
 
     const convertToWei = function(value, unit_index=0) {
         var sint, sfrac;
@@ -769,10 +793,10 @@ $(async function() {
             var current_account = accounts[0];
             var balance = await provider.getBalance(current_account.address);
             var addr = current_account.address;
-            $('.nav-current-account').text(addr);
+            $('.nav-current-account').text(shortenedAddress(addr));
             $('.nav-current-account').attr('title', addr);
             var balanceEther = parseFloat(ethers.formatEther(balance));
-            $('.nav-current-amount').text(balanceEther + ethers.EtherSymbol);
+            $('.nav-current-amount').text(balanceEther.toFixed(4) + ethers.EtherSymbol);
             $('.nav-current-amount').attr('title', ethers.formatEther(balance) + ethers.EtherSymbol);
 
             await onhashchange();
@@ -814,7 +838,8 @@ $(async function() {
         input_amount_unit$.empty();
         for(var i in etherUnits) {
             var unit = etherUnits[i];
-            var option = `<option title="${unit}" value=${i}>${unit}</option>`;
+            var unitName = etherUnitNames.get(unit) || unit;
+            var option = `<option value="${i}" title="${unitName}">${unit}</option>`;
             var option$ = input_amount_unit$.append(option);
             for(var j=0; j < option$.length; j++) {
                 option$[j].index = i;
@@ -825,7 +850,7 @@ $(async function() {
             if(hidden$.val())
                 $(input_amount_unit$[i]).val(hidden$.val());
             else
-                $(input_amount_unit$[i]).val(3);
+                $(input_amount_unit$[i]).val(6);  // default unit is ETH
         }
 
         input_amount_unit$.on('change', function(event) {
