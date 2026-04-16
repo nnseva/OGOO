@@ -364,8 +364,7 @@
             <span class="account-address nav-current-account fs-07 font-monospace">Not Connected</span>
         </div>
         <div class="badge bg-white text-dark border p-2 rounded-pill shadow-sm">
-            <i class="fa-brands fa-ethereum me-1 text-primary"></i>
-            <span class="nav-current-amount fw-bold">0 ETH</span>
+            <span class="nav-current-amount fw-bold">N/A</span>
         </div>
     </div>
 
@@ -530,10 +529,12 @@
                   <!-- contribution_min_balance -->
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
-                        <input type="text" class="form-control w-50 input-contribution-min-balance" data-t="input-contribution-min-balance" placeholder="Min contribution" pattern="[0-9]+(\.[0-9]{1,3})?" required>
+                        <input type="text" class="form-control w-50 input-contribution-min-balance balance-convert" data-t="input-contribution-min-balance" placeholder="Min contribution" pattern="[0-9]+(\.[0-9]{1,3})?" required>
                         <input type="hidden" class="select-value"> 
                         <select class="form-select input-group-text input-amount-unit" size style="width:100px;" data-t="input-amount-unit" aria-label="Min contribution units">
                         </select>
+                    </div>
+                    <div class="balance-convert-result form-text text-success">
                     </div>
                     <div class="invalid-feedback" data-t="input-contribution-min-balance-invalid-feedback">
                         Input value ≥ 0, no more than 3 decimal digits
@@ -556,10 +557,12 @@
                   <!-- voting_start_balance -->
                   <div class="form-check col col-12 col-sm-6 col-lg-4">
                     <div class="input-group">
-                        <input type="text" class="form-control w-50 input-voting-start-balance" data-t="input-voting-start-balance" placeholder="Voting start balance" pattern="[0-9]+(\.[0-9]{1,3})?" required>
+                        <input type="text" class="form-control w-50 input-voting-start-balance balance-convert" data-t="input-voting-start-balance" placeholder="Voting start balance" pattern="[0-9]+(\.[0-9]{1,3})?" required>
                         <input type="hidden" class="select-value">
                         <select class="form-select input-group-text input-amount-unit" size style="width:100px;" data-t="input-amount-unit" aria-label="Balance units">
                         </select>
+                    </div>
+                    <div class="balance-convert-result form-text text-success">
                     </div>
                     <div class="invalid-feedback" data-t="input-voting-start-balance-invalid-feedback">
                         Input value ≥ 0, no more than 3 decimal digits
@@ -1086,11 +1089,14 @@
                 <div class="modal-body">
                     <div class="form-check p-0">
                       <div class="input-group">
-                          <input type="text" class="form-control w-50 input-amount" data-t="create-contribution-dialog-amount-placeholder" placeholder="Contribution amount" pattern="[0-9]+(\.[0-9]{1,3})?" required>
+                          <input type="text" class="form-control w-50 input-amount balance-convert" data-t="create-contribution-dialog-amount-placeholder" placeholder="Contribution amount" pattern="[0-9]+(\.[0-9]{1,3})?" required>
                           <input type="hidden" class="select-value"> 
                           <select class="form-select input-group-text input-amount-unit" data-t="create-contribution-dialog-amount-unit-title" title="Select amount unit" size style="width:100px;" aria-label="Contribution units">
                           </select>
                       </div>
+                    </div>
+                    <div>
+                      <div class="text-success balance-convert-result"></div>
                     </div>
                     <div class="form-check p-0">
                       <div class="input-group">

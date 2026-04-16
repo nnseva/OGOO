@@ -141,6 +141,55 @@ $(async function() {
         return ret;
     };
 
+    // Read Ether price from open API and store in localStorage
+    const fetchEtherPrice = async function(callback) {
+        var price = localStorage.getItem('ogoo_eth_price');
+        var price_timestamp = localStorage.getItem('ogoo_eth_price_timestamp');
+        if(price_timestamp) {
+            price_timestamp = parseInt(price_timestamp);
+            var now = Date.now();
+            if(now - price_timestamp < 10 * 60 * 1000) {
+                if(callback) {
+                    callback(price);
+                }
+                return;
+            }
+        }
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+            const data = await response.json();
+            const price = data.ethereum.usd;
+            localStorage.setItem('ogoo_eth_price', price);
+            localStorage.setItem('ogoo_eth_price_timestamp', Date.now().toString());
+            if(callback) {
+                callback(price);
+            }
+        } catch (ex) {
+            console.error('Error fetching Ether price from API', ex);
+        }
+    };
+
+    const etherToUSD = function(amount, callback) {
+        // returns approximate USD value of the given amount of Wei, based on the current Ether price
+        // Note: this is a very rough estimation, as it does not account for the time of the price
+        // retrieval and the price volatility. It is recommended to use this function only for display purposes,
+        // and not for any critical calculations.
+        fetchEtherPrice(function(price) {  // Refresh the price in the background if necessary
+            try {
+                price = parseFloat(price);
+                var amountEther = parseFloat(ethers.formatEther(amount));
+                if(callback) {
+                    callback((amountEther * price).toFixed(2));
+                }
+            } catch(ex) {
+                console.error('Error parsing Ether price from localStorage', price, ex);
+                if(callback) {
+                    callback(null);
+                }
+            }
+        });
+    }
+
     const shortenedAddress = function(address) {
         return address.substr(0, 6) + '...' + address.substr(-4);
     }
@@ -571,10 +620,24 @@ $(async function() {
                 var managed_list_row = $($('#managed-list-row').text());
                 managed_list_row.find('.offer-address').text(offer_record.id);
                 managed_list_row.find('.offer-title').text(offer_record.definition.caption);
-                managed_list_row.find('.offer-contribution').text(etherFormatApprox(offer_record.contribution));
-                managed_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ethers.EtherSymbol);
-                managed_list_row.find('.offer-balance').text(etherFormatApprox(offer_record.amount));
-                managed_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ethers.EtherSymbol);
+                etherToUSD(offer_record.contribution, function(usd) {
+                    if( usd == null ) {
+                        managed_list_row.find('.offer-contribution').text('N/A');
+                        managed_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    managed_list_row.find('.offer-contribution').text(usd + ' USD');
+                    managed_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                });
+                etherToUSD(offer_record.amount, function(usd) {
+                    if( usd == null ) {
+                        managed_list_row.find('.offer-balance').text('N/A');
+                        managed_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    managed_list_row.find('.offer-balance').text(usd + ' USD');
+                    managed_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                });
                 if(offer_record.state != 0n) {
                     managed_list_row.find('.offer-edit-button').addClass('disabled');
                     managed_list_row.find('.offer-approve-button').addClass('disabled');
@@ -597,10 +660,24 @@ $(async function() {
                 var contribution_list_row = $($('#contribution-list-row').text());
                 contribution_list_row.find('.offer-address').text(offer_record.id);
                 contribution_list_row.find('.offer-title').text(offer_record.definition.caption);
-                contribution_list_row.find('.offer-contribution').text(etherFormatApprox(offer_record.contribution));
-                contribution_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ethers.EtherSymbol);
-                contribution_list_row.find('.offer-balance').text(etherFormatApprox(offer_record.amount));
-                contribution_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ethers.EtherSymbol);
+                etherToUSD(offer_record.contribution, function(usd) {
+                    if( usd == null ) {
+                        contribution_list_row.find('.offer-contribution').text('N/A');
+                        contribution_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    contribution_list_row.find('.offer-contribution').text(usd + ' USD');
+                    contribution_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                });
+                etherToUSD(offer_record.amount, function(usd) {
+                    if( usd == null ) {
+                        contribution_list_row.find('.offer-balance').text('N/A');
+                        contribution_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    contribution_list_row.find('.offer-balance').text(usd + ' USD');
+                    contribution_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                });
 
                 if(offer_record.state > 1n) {
                     contribution_list_row.find('.offer-add-contribution-button').addClass('disabled');
@@ -647,10 +724,24 @@ $(async function() {
                 var observing_list_row = $($('#observing-list-row').text());
                 observing_list_row.find('.offer-address').text(offer_record.id);
                 observing_list_row.find('.offer-title').text(offer_record.definition.caption);
-                observing_list_row.find('.offer-contribution').text(etherFormatApprox(offer_record.contribution));
-                observing_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ethers.EtherSymbol);
-                observing_list_row.find('.offer-balance').text(etherFormatApprox(offer_record.amount));
-                observing_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ethers.EtherSymbol);
+                etherToUSD(offer_record.contribution, function(usd) {
+                    if( usd == null ) {
+                        observing_list_row.find('.offer-contribution').text('N/A');
+                        observing_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    observing_list_row.find('.offer-contribution').text(usd + ' USD');
+                    observing_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                });
+                etherToUSD(offer_record.amount, function(usd) {
+                    if( usd == null ) {
+                        observing_list_row.find('.offer-balance').text('N/A');
+                        observing_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    observing_list_row.find('.offer-balance').text(usd + ' USD');
+                    observing_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                });
                 if(offer_record.state != 1n) {
                     observing_list_row.find('.observer-vote-button').addClass('disabled');
                 }
@@ -674,10 +765,24 @@ $(async function() {
             offer_list_row_icon_box.append('&nbsp;');
             offer_list_row_icon_box.append($($('#icon-state-' + offer_record.state_name).text()));
             offer_list_row_icon_box.parent().append($($('#badge-state-' + offer_record.state_name).text()));
-            offer_list_row.find('.offer-contribution').text(etherFormatApprox(offer_record.contribution));
-            offer_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ethers.EtherSymbol);
-            offer_list_row.find('.offer-balance').text(etherFormatApprox(offer_record.amount));
-            offer_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ethers.EtherSymbol);
+            etherToUSD(offer_record.contribution, function(usd) {
+                if( usd == null ) {
+                    offer_list_row.find('.offer-contribution').text('N/A');
+                    offer_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                    return;
+                }
+                offer_list_row.find('.offer-contribution').text(usd + ' USD');
+                offer_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+            });
+            etherToUSD(offer_record.amount, function(usd) {
+                if( usd == null ) {
+                    offer_list_row.find('.offer-balance').text('N/A');
+                    offer_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                    return;
+                }
+                offer_list_row.find('.offer-balance').text(usd + ' USD');
+                offer_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+            }); 
             offer_list_container.append(translateTree(offer_list_row));
         });
         $('#all-contributions-number').text(contributions);
@@ -795,10 +900,15 @@ $(async function() {
             var addr = current_account.address;
             $('.nav-current-account').text(shortenedAddress(addr));
             $('.nav-current-account').attr('title', addr);
-            var balanceEther = parseFloat(ethers.formatEther(balance));
-            $('.nav-current-amount').text(balanceEther.toFixed(4) + ethers.EtherSymbol);
-            $('.nav-current-amount').attr('title', ethers.formatEther(balance) + ethers.EtherSymbol);
-
+            etherToUSD(balance, function(usd) {
+                if( usd == null ) {
+                    $('.nav-current-amount').text('N/A');
+                    $('.nav-current-amount').attr('title', ethers.formatEther(balance) + ' ' + ethers.EtherSymbol);
+                    return;
+                }
+                $('.nav-current-amount').text('≊' + usd + ' USD');
+                $('.nav-current-amount').attr('title', ethers.formatEther(balance) + ' ' + ethers.EtherSymbol);
+            });
             await onhashchange();
             await fill_offer_lists();
         }
@@ -1022,6 +1132,28 @@ $(async function() {
         modal_info$.addClass('text-info');
         modal_info$.text('');
         bootstrap.Modal.getOrCreateInstance(dialogue$[0]).show();
+    });
+
+    $(document).on('input', 'input.balance-convert', async function(event) {
+        var input$ = $(event.currentTarget);
+        var value = input$.val();
+        var unit = input$.parent().find('select').val();
+        var result$ = input$.parentsUntil(':has(.balance-convert-result)').parent().find('.balance-convert-result');
+        if( value && !isNaN(value) ) {
+            var wei = convertToWei(value, unit);
+            etherToUSD(wei, function(usd) {
+                if( usd == null ) {
+                    result$.text('≊' + 'N/A');
+                    result$.attr('title', ethers.formatEther(wei) + ' ' + ethers.EtherSymbol);
+                    return;
+                }
+                result$.text('≊' + usd + ' USD');
+                result$.attr('title', ethers.formatEther(wei) + ' ' + ethers.EtherSymbol);
+            });
+        } else {
+            result$.text('');
+            result$.attr('title', '');
+        }
     });
 
     {
@@ -1960,9 +2092,15 @@ $(async function() {
         }
         renderMarkdownTo($('#view-offer .offer-description'), offer_record.definition.description);
         renderMarkdownTo($('#view-offer .offer-full-details'), offer_record.definition.full_details);
-        $('#view-offer .offer-contribution-min-balance').text(etherHuman(offer_record.definition.contribution_min_balance));
+        etherToUSD(offer_record.definition.contribution_min_balance, function(usd) {
+            $('#view-offer .offer-contribution-min-balance').text(usd ? '≊$' + usd : '');
+            $('#view-offer .offer-contribution-min-balance').attr('title', ethers.formatEther(offer_record.definition.contribution_min_balance) + ' ' + ethers.EtherSymbol);
+        });
         $('#view-offer .offer-contribution-unlock-timeout').text(durationHuman(offer_record.definition.contribution_unlock_timeout));
-        $('#view-offer .offer-voting-start-balance').text(etherHuman(offer_record.definition.voting_start_balance));
+        etherToUSD(offer_record.definition.voting_start_balance, function(usd) {
+            $('#view-offer .offer-voting-start-balance').text(usd ? '≊$' + usd : '');
+            $('#view-offer .offer-voting-start-balance').attr('title', ethers.formatEther(offer_record.definition.voting_start_balance) + ' ' + ethers.EtherSymbol);
+        });
         $('#view-offer .offer-voting-start-count').text(offer_record.definition.voting_start_count);
         $('#view-offer .offer-voting-start-timeout').text(durationHuman(offer_record.definition.voting_start_timeout));
         $('#view-offer .offer-voting-fail-timeout').text(durationHuman(offer_record.definition.voting_fail_timeout));
@@ -1975,7 +2113,10 @@ $(async function() {
         $('#view-offer .offer-state-icon').html(translateTree(
             $($('#icon-state-' + offer_record.state_name).text())
         ));
-        $('#view-offer .offer-balance').text(etherHuman(offer_record.amount));
+        etherToUSD(offer_record.amount, function(usd) {
+            $('#view-offer .offer-balance').text(usd ? '≊$' + usd : '');
+            $('#view-offer .offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+        });
         $('#view-offer .offer-approved-at-row').addClass('d-none');
         $('#view-offer .offer-voting-started-at-row').addClass('d-none');
         $('#view-offer .offer-completed-at-row').addClass('d-none');
@@ -2002,9 +2143,10 @@ $(async function() {
         $('#view-offer .offer-total-contributors-count').text(
             offer_record.voting_statistics.total_contributors_count
         );
-        $('#view-offer .offer-total-contributors-fund').text(
-            etherHuman(offer_record.voting_statistics.total_contributors_fund)
-        );
+        etherToUSD(offer_record.voting_statistics.total_contributors_fund, function(usd) {
+            $('#view-offer .offer-total-contributors-fund').text(usd ? '≊$' + usd : '');
+            $('#view-offer .offer-total-contributors-fund').attr('title', ethers.formatEther(offer_record.voting_statistics.total_contributors_fund) + ' ' + ethers.EtherSymbol);
+        });
         $('#view-offer .offer-observer-contenders-count').text(
             offer_record.voting_statistics.sorted_observers_leaders.length
         );
