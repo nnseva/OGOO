@@ -274,7 +274,7 @@
                     '<p><span class="text-danger dialog-error small mb-3"></span></p>'
             },
             'no-accounts-dialog-connect-button-text': 'Подключить кошелек',
-            'nav_dashboard': 'Панель управления',
+            'nav_dashboard': 'Главная',
             'nav_offers': 'Предложения',
             'nav_offers_list': 'Все предложения',
             'nav_add_offer': 'Добавить по адресу',
