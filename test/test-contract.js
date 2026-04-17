@@ -1587,7 +1587,7 @@ describe("Contract Tests", function () {
         "voting_start_balance": 0n,
         "voting_start_count": 0n,
         "voting_start_timeout": 3600n,
-        "voting_fail_timeout": 20n,
+        "voting_fail_timeout": hre.network.name == 'local' ? 45n: 6n,
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
@@ -1718,6 +1718,8 @@ describe("Contract Tests", function () {
     } catch(e) {
       if( e.data ) {
         console.error("Unexpected revert", o.interface.parseError(e.data));
+      } else {
+        console.error("Unknown revert", e);
       }
       throw e;
     }

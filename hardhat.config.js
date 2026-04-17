@@ -116,7 +116,7 @@ module.exports = {
 //   }
   networks: {
     local: {
-      url: 'http://127.0.0.1:' + (process.env.LOCAL_PORT || 32002), // Kurtosis port from the config or output
+      url: 'http://127.0.0.1:' + (process.env.LOCAL_PORT || 32003), // Kurtosis port from the config or output
       // These are private keys associated with prefunded test accounts created by the eth-network-package
       //https://github.com/kurtosis-tech/ethereum-package/blob/main/src/prelaunch_data_generator/genesis_constants/genesis_constants.star
       accounts: [
