@@ -238,6 +238,11 @@
             },
             'approve-offer-dialog-approve-button': 'Approve',
             'cancel-contribution-dialog-header-text': 'Cancel Contribution',
+            'cancel-contribution-dialog-warning-html': {
+                html: '<p>Once you cancel the contribution, you will <i>no longer</i> be able to <i>vote</i> for this offer</p>' +
+                    '<p>After the cooldown period, call this function again to return back the funds to your account</p>' +
+                    '<p>Are you sure you want to cancel your contribution?</p>'
+            },
             'cancel-contribution-dialog-cancel-button': 'Cancel Contribution',
             'create-offer-submit-modal-head-text': 'Create Offer',
             'create-offer-submit-header-html': {html: 'Account <em class="current-account-id account-address"></em> is going to create the Offer contract'},
@@ -500,6 +505,11 @@
             },
             'approve-offer-dialog-approve-button': 'Одобрить',
             'cancel-contribution-dialog-header-text': 'Отменить вклад',
+            'cancel-contribution-dialog-warning-html': {
+                html: '<p>После отмены вклада вы <i>больше не сможете</i> голосовать за это предложение</p>' +
+                    '<p>После периода охлаждения вызовите эту функцию снова, чтобы вернуть средства на ваш аккаунт</p>' +
+                    '<p>Вы уверены, что хотите отменить свой вклад?</p>'
+            },
             'cancel-contribution-dialog-cancel-button': 'Отменить вклад',
             'create-offer-submit-modal-head-text': 'Создать предложение',
             'create-offer-submit-header-html': {html: 'Аккаунт <em class="current-account-id account-address"></em> собирается создать контракт предложения'},
