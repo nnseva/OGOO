@@ -5,10 +5,32 @@ should();
 // TODO: test revoting for correct change leaders state
 // TODO: test CancelationInProgress
 
+// Helper functions
+
+var gas_price; // in Wei
+var wei_price; // in dollars
+
+// Get the real world price of wei and gas price from the open source price feed
+async function fetchPrice() {
+  if( typeof(gas_price) == 'undefined' || typeof(wei_price) == 'undefined' ) {
+    var price_data = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd').then(response => response.json());
+    wei_price = price_data.ethereum.usd / 10.**18; // Price of 1 wei in dollars
+    var gas_data = await fetch('https://api.owlracle.info/v4/eth/gas?eip1559=false').then(response => response.json());
+    var total_sum = 0;
+    for(var k in gas_data.speeds) {
+      total_sum += gas_data.speeds[k].gasPrice;
+    }
+    gas_price = BigInt(Math.floor(total_sum / Object.keys(gas_data.speeds).length * 10**9)); // Average gas price in wei
+    console.debug("Fetched price data: Gas price (WEI):", gas_price,  "Wei price ($):", wei_price);
+  }
+}
+
 function to$(wei) {
-  var cents_per_ether = 300000n;
-  var weis_per_ether = 1000000000000000000n;
-  return hre.ethers.toNumber((wei * cents_per_ether) / weis_per_ether ) / 100.;
+  return (hre.ethers.toNumber(wei / 10n**9n) * wei_price * 10.**9).toFixed(2);
+}
+
+function gasTo$ (gas) {
+  return to$(gas * gas_price);
 }
 
 function extractData(ex) {
@@ -33,6 +55,9 @@ const as_vote = function(voting) {
 }
 
 describe("Contract Tests", function () {
+  beforeEach(async function () {
+    await fetchPrice();
+  });
   it("Test the contract life circle main path", async function () {
     console.log("Test the contract life circle main path");
     var test_definition = {
@@ -66,11 +91,9 @@ describe("Contract Tests", function () {
     console.debug("Owner account at the beginning:", beginning_balance);
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     var contract_abi = require("../artifacts/contracts/ogoo.sol/Offer.json");
-    // Gas price and other fee data
-    var fee_data = await account_owner.provider.getFeeData();
     // Calculate gas for deployment
     var deployment_gas_price = await account_owner.estimateGas(await Offer.getDeployTransaction(test_definition));
-    console.debug("Projected deployment price:", deployment_gas_price, deployment_gas_price * fee_data.gasPrice, "Amount $:", to$(deployment_gas_price * fee_data.gasPrice));
+    console.debug("Projected deployment gas price:", deployment_gas_price, "Real world amount $:", gasTo$(deployment_gas_price));
     var start_balance = await account_owner.provider.getBalance(account_owner.address);
     console.debug("Owner account before deployment:", start_balance, start_balance - beginning_balance);
     // Start deployment, returning a promise that resolves to a contract object
@@ -89,15 +112,14 @@ describe("Contract Tests", function () {
     expect(offer_created_log).to.be.a('undefined');
     account_owner.provider.on(create_offer_filter, create_offer_handler);
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
     await new Promise(resolve => setTimeout(resolve, 1000));
     account_owner.provider.off(create_offer_filter, create_offer_handler);
     expect(offer_created_log).to.not.be.a('undefined');
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract owner is:", await offer.owner());
 
     // Gettings access from the owner
@@ -134,8 +156,6 @@ describe("Contract Tests", function () {
       contract_abi.abi,
       account_outside, // Outside account trying access to the contract
     )
-
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -343,12 +363,11 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -391,7 +410,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -540,12 +558,11 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -587,8 +604,6 @@ describe("Contract Tests", function () {
       contract_abi.abi,
       account_outside, // Outside account trying access to the contract
     )
-
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -700,12 +715,11 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -748,7 +762,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -912,11 +925,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -959,7 +971,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1097,11 +1108,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1144,7 +1154,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1279,11 +1288,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1313,7 +1321,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1432,11 +1439,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1481,7 +1487,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1603,11 +1608,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1643,7 +1647,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1749,7 +1752,9 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -1859,8 +1864,10 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -1965,8 +1972,10 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -2086,8 +2095,10 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -2197,8 +2208,10 @@ describe("Contract Tests", function () {
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -2471,8 +2484,10 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -2582,8 +2597,10 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -2693,8 +2710,10 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
