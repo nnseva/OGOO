@@ -78,9 +78,10 @@ event OfferFailed();
 - `ContributionUpdated(address payable indexed contributor, uint amount)` – Emitted when an existing contributor increases their contribution; reflects the total contributed amount.
 - `ContributionCancelation(address payable indexed contributor)` – Emitted when a contributor initiates a refund request.
 - `ContributionCanceled(address payable indexed contributor)` – Emitted when a contributor receives a refund after the unlock timeout expires.
+- `ContributorVote(address payable indexed contributor, address payable contender, bool failure)` – Emitted when a contributor casts a vote. The `failure` flag means voting for failure. Zero `address` together with `failure=false` means canceling the vote.
+- `ObserverVote(address payable indexed observer, address payable contender, bool failure)` – Emitted when an observer casts a vote. The `failure` flag means voting for failure. Zero `address` together with `failure=false` means canceling the vote.
 - `OfferCompleted(address payable winner, uint amount)` – Emitted when the Offer is successfully completed and funds are transferred to the contender.
-- `ContributorVote(address payable indexed contributor, address payable contender, bool failure)` – Emitted when a contributor casts a vote.
-- `ObserverVote(address payable indexed observer, address payable contender, bool failure)` – Emitted when an observer casts a vote.
+- `OfferPayoutFailed()` - Emitted if the payout to the winner's account has failed for any reason, the offer doesn't change it's status.
 - `OfferFailed()` – Emitted when the Offer fails.
 
 ## 🛡️ Modifiers
@@ -175,19 +176,25 @@ function contributor_vote(address payable voice) external started_only() contrib
 ```solidity
 function contributor_vote_failure() external started_only() contributor_only() sender_origin()
 ```
+```solidity
+function contributor_vote_cancel() external started_only() contributor_only() sender_origin()
+```
 
-Contributors can vote for a contender or indicate Offer failure. Votes may be changed until the Offer is finalized.
+Contributors can vote for a contender, indicate Offer failure, or cancel the vote. Votes may be changed until the Offer is finalized.
 
 ## 🗳️ Observer Voting Methods
 
 ```solidity
-function observer_vote(address payable voice) external started_only() observer_only()
+function observer_vote(address payable voice) external started_only() observer_only() sender_origin()
 ```
 ```solidity
-function observer_vote_failure() external started_only() observer_only()
+function observer_vote_failure() external started_only() observer_only() sender_origin()
+```
+```solidity
+function observer_vote_cancel() external started_only() observer_only() sender_origin()
 ```
 
-Observers can vote for a contender or indicate Offer failure, with the option to change their vote until the Offer is finalized.
+Observers can vote for a contender, indicate Offer failure, or cancel the vote, with the option to change their vote until the Offer is finalized.
 
 ## 📊 Public Variables
 

@@ -42,11 +42,15 @@ The `contribution_min_balance` attribute defines the **minimum contribution amou
 - The **total balance** of a contributor must always remain at or above this threshold.
 
 ### ⏳ Contribution Unlock Timeout
-The `contribution_unlock_timeout` attribute defines the **unlock timeout** (in seconds) for contribution refunds.
+The `contribution_unlock_timeout` attribute defines the **unlock timeout** (in seconds) that applies when a contributor requests a refund.
 
-Contributors can request a **refund**, but the process occurs in **two steps**:  
-1. **Initial request** – Marks the contributor for refund processing and starts the [unlock timeout](OfferDefinition.md#-contribution-unlock-timeout). Voting rights are suspended until the contributor reclaims the contribution.
+Refunds are processed in **two steps**:  
+1. **Initial request** – Registers the contributor for refund processing and starts the [unlock timeout](OfferDefinition.md#-contribution-unlock-timeout). The contributor's voting rights are suspended until the contribution is reclaimed.
 2. **Final request** – After the timeout expires, the contributor may reclaim all of their contributions in a single transaction.
+
+During the **unlock timeout**:
+- the contributor's vote is canceled
+- the contributor's funds remain in the impact fund and may still be transferred to the winning contender if the vote is completed successfully
 
 ---
 

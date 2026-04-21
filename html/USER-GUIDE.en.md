@@ -18,7 +18,13 @@ An impact fund has two types of participants: *contributors* and *observers*.
 
 *Observers* are added during the initial setup period. They monitor the fund's progress and confirm the contributors' decision about awarding the prize.
 
+### User Identification
+
 Contributors, observers, the fund creator (owner), and the prize recipient are all identified by their wallet addresses.
+
+Participants and the fund creator (owner) may exercise their rights only through wallet addresses they control directly. Such wallets are called EOAs (Externally Owned Accounts). The use of intermediary contracts (proxy contracts) to manage the fund is not allowed, in order to prevent manipulation by proxy providers.
+
+The prize recipient may designate either their own EOA or any other address to receive the prize, including, for example, the address of a proxy contract, so that the fund can transfer the reward to that address.
 
 ### Fund Creator
 
@@ -243,10 +249,10 @@ Supported amount units:
 - w - ${Wei}=10^{-18}Ξ$
 - Kw - ${KiloWei}=10^{-15}Ξ$
 - Mw - ${MegaWei}=10^{-12}Ξ$
-- Gw - ${GigaWei}=10^{-9}Ξ$ - the default choice
+- Gw - ${GigaWei}=10^{-9}Ξ$
 - mkΞ - ${MicroEther}=10^{-6}Ξ$
 - mΞ - ${MilliEther}=10^{-3}Ξ$
-- Ξ - ${Ether}=1Ξ$
+- Ξ - ${Ether}=1Ξ$ - the default choice
 - KΞ - ${KiloEther}=10^{3}Ξ$
 - MΞ - ${MegaEther}=10^{6}Ξ$
 - GΞ - ${GigaEther}=10^{9}Ξ$
@@ -388,6 +394,8 @@ The observer list is simply a list of Ethereum wallet addresses. The fund creato
 Add observers using the `+` button in the observer list field.
 
 The Add Observer dialog is an Ethereum address entry dialog. You can copy a wallet address from any source and paste it into the input field. You can also enter an address using the QR code scanner.
+
+Add only EOA (Externally Owned Account) addresses to the observer list. When an address is added, the contract cannot verify on its own whether that address is an EOA. At the same time, the fund can authorize observer actions only if they are performed directly from an EOA.
 
 After confirming the Add Observer dialog, the application will initiate the add-observer transaction, which requires wallet confirmation and a small network fee.
 
