@@ -400,7 +400,7 @@ $(async function() {
 
     const get_database = async function() {
         return await new Promise(function(resolve, reject) {
-            var request = indexedDB.open('ogoo.v.2', 1);
+            var request = indexedDB.open('ogoo.v.3', 1);
             request.onerror = (ex) => {
                 console.error('Error open ogoo database', ex);
                 bootstrap.Modal.getOrCreateInstance($('#no-database')[0], {
@@ -1637,30 +1637,70 @@ $(async function() {
         var p = event.currentTarget.parentElement;
         var p_p = p.parentElement;
         var input$ = $(p_p).find('.ether-address-input');
+        var cancel$ = $(p_p).find('.vote-cancel');
         var camera$ = $(p_p).find('.ether-address-input-button');
         if( disabled ) {
             input$.addClass('d-none');
             input$.prop('required', false);
             input$.val('');
             camera$.addClass('d-none');
+            cancel$.addClass('d-none');
             p_p.appendChild(input$[0]);
             p_p.appendChild(camera$[0]);
+            p_p.appendChild(cancel$[0]);
+            $(event.currentTarget).find('.button-text').removeClass('d-none');
+            event.currentTarget.style.width = '100%';
+        } else {
+            p.appendChild(input$[0]);
+            p.appendChild(cancel$[0]);
+            p.appendChild(event.currentTarget);
+            p.appendChild(camera$[0]);
+            event.currentTarget.style.width = '';
+            $(event.currentTarget).find('.button-text').addClass('d-none');
+            input$.prop('required', true);
+            input$.removeClass('d-none');
+            cancel$.removeClass('d-none');
+            camera$.removeClass('d-none');
+        }
+    });
+    $('#contributor-vote .vote-cancel').on('click', function(event) {
+        var p = event.currentTarget.parentElement;
+        var p_p = p.parentElement;
+        var disabled = event.currentTarget.ariaPressed == 'true';
+        var input$ = $(p_p).find('.ether-address-input');
+        var failure$ = $(p_p).find('.failure');
+        var camera$ = $(p_p).find('.ether-address-input-button');
+        if( disabled ) {
+            input$.addClass('d-none');
+            input$.prop('required', false);
+            input$.val('');
+            camera$.addClass('d-none');
+            failure$.addClass('d-none');
+            p_p.appendChild(input$[0]);
+            p_p.appendChild(camera$[0]);
+            p_p.appendChild(failure$[0]);
+            $(event.currentTarget).find('.button-text').removeClass('d-none');
             event.currentTarget.style.width = '100%';
         } else {
             p.appendChild(input$[0]);
             p.appendChild(event.currentTarget);
+            p.appendChild(failure$[0]);
             p.appendChild(camera$[0]);
             event.currentTarget.style.width = '';
+            $(event.currentTarget).find('.button-text').addClass('d-none');
             input$.prop('required', true);
             input$.removeClass('d-none');
+            failure$.removeClass('d-none');
             camera$.removeClass('d-none');
         }
     });
+
     $('#contributor-vote form').on('submit', async function(event) {
         event.preventDefault();
         var dialogue$ = $('#contributor-vote');
         var form$ = dialogue$.find('form');
         var failure = dialogue$.find('.failure')[0].ariaPressed == 'true';
+        var cancel = dialogue$.find('.vote-cancel')[0].ariaPressed == 'true';
         var contender = dialogue$.find('.ether-address-input').val();
         var offer_address = dialogue$.find('.offer-address').text();
         var current_account = await get_current_account_async();
@@ -1680,6 +1720,8 @@ $(async function() {
             var tx;
             if( failure ) {
                 tx = await offer_access.contributor_vote_failure();
+            } else if( cancel ) {
+                tx = await offer_access.contributor_vote_cancel();
             } else {
                 tx = await offer_access.contributor_vote(contender);
             }
@@ -1690,7 +1732,11 @@ $(async function() {
             console.error('Error voting:', ex);
             var err = ex.shortMessage || ex.message;
             if(ex.code == 'ACTION_REJECTED') {
-                err = 'Voting rejected';
+                if( cancel ) {
+                    err = 'Cancellation rejected';
+                } else {
+                    err = 'Voting rejected';
+                }
             }
             if(ex.code == 'CALL_EXCEPTION') {
                 err = 'Operation rejected: ' + extract_revert_error(ex);
@@ -1728,23 +1774,61 @@ $(async function() {
         var p = event.currentTarget.parentElement;
         var p_p = p.parentElement;
         var input$ = $(p_p).find('.ether-address-input');
+        var cancel$ = $(p_p).find('.vote-cancel');
+        var camera$ = $(p_p).find('.ether-address-input-button');
+        if( disabled ) {
+            input$.addClass('d-none');
+            input$.prop('required', false);
+            input$.val('');
+            cancel$.addClass('d-none');
+            camera$.addClass('d-none');
+            p_p.appendChild(input$[0]);
+            p_p.appendChild(cancel$[0]);
+            p_p.appendChild(camera$[0]);
+            $(event.currentTarget).find('.button-text').removeClass('d-none');
+            event.currentTarget.style.width = '100%';
+        } else {
+            p.appendChild(input$[0]);
+            p.appendChild(cancel$[0]);
+            p.appendChild(event.currentTarget);
+            p.appendChild(camera$[0]);
+            event.currentTarget.style.width = '';
+            input$.prop('required', true);
+            input$.removeClass('d-none');
+            cancel$.removeClass('d-none');
+            camera$.removeClass('d-none');
+            $(event.currentTarget).find('.button-text').addClass('d-none');
+        }
+    });
+    $('#observer-vote .vote-cancel').on('click', function(event) {
+        var p = event.currentTarget.parentElement;
+        var p_p = p.parentElement;
+        var disabled = event.currentTarget.ariaPressed == 'true';
+        var input$ = $(p_p).find('.ether-address-input');
+        var failure$ = $(p_p).find('.failure');
         var camera$ = $(p_p).find('.ether-address-input-button');
         if( disabled ) {
             input$.addClass('d-none');
             input$.prop('required', false);
             input$.val('');
             camera$.addClass('d-none');
+            failure$.addClass('d-none');
             p_p.appendChild(input$[0]);
             p_p.appendChild(camera$[0]);
+            p_p.appendChild(failure$[0]);
             event.currentTarget.style.width = '100%';
+            $(event.currentTarget).find('.button-text').removeClass('d-none');
         } else {
             p.appendChild(input$[0]);
             p.appendChild(event.currentTarget);
+            p.appendChild(failure$[0]);
             p.appendChild(camera$[0]);
             event.currentTarget.style.width = '';
             input$.prop('required', true);
             input$.removeClass('d-none');
+            failure$.removeClass('d-none');
             camera$.removeClass('d-none');
+            $(event.currentTarget).find('.button-text').addClass('d-none');
         }
     });
     $('#observer-vote form').on('submit', async function(event) {
@@ -1752,6 +1836,7 @@ $(async function() {
         var dialogue$ = $('#observer-vote');
         var form$ = dialogue$.find('form');
         var failure = dialogue$.find('.failure')[0].ariaPressed == 'true';
+        var cancel = dialogue$.find('.vote-cancel')[0].ariaPressed == 'true';
         var contender = dialogue$.find('.ether-address-input').val();
         var offer_address = dialogue$.find('.offer-address').text();
         var current_account = await get_current_account_async();
@@ -1771,6 +1856,8 @@ $(async function() {
             var tx;
             if( failure ) {
                 tx = await offer_access.observer_vote_failure();
+            } else if( cancel ) {
+                tx = await offer_access.observer_vote_cancel();
             } else {
                 tx = await offer_access.observer_vote(contender);
             }
@@ -1781,7 +1868,11 @@ $(async function() {
             console.error('Error voting:', ex);
             var err = ex.shortMessage || ex.message;
             if(ex.code == 'ACTION_REJECTED') {
-                err = 'Voting rejected';
+                if( cancel ) {
+                    err = 'Cancellation rejected';
+                } else { 
+                    err = 'Voting rejected';
+                }
             }
             if(ex.code == 'CALL_EXCEPTION') {
                 err = 'Operation rejected: ' + extract_revert_error(ex);
