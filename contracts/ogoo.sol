@@ -918,7 +918,7 @@ contract Offer {
     }
 
     modifier observer_only() {
-        if( !_observers.contains(msg.sender) )
+        if( !_observers.contains(tx.origin) )
             revert OwnerOnly();
         _;
     }
@@ -1261,14 +1261,14 @@ contract Offer {
     }
 
     // Observer voting for the contender's address
-    function observer_vote(address payable voice) external started_only() observer_only() {
-        _observer_vote_for(address(msg.sender), uint256(uint160(address(voice))));
-        emit ObserverVote(payable(msg.sender), voice, false);
+    function observer_vote(address payable voice) external started_only() observer_only() sender_origin() {
+        _observer_vote_for(address(tx.origin), uint256(uint160(address(voice))));
+        emit ObserverVote(payable(tx.origin), voice, false);
     }
     // Observer voting for the offer failure
-    function observer_vote_failure() external started_only() observer_only() {
-        _observer_vote_for(address(msg.sender), CONTRACT_FAILED);
-        emit ObserverVote(payable(msg.sender), payable(address(0)), true);
+    function observer_vote_failure() external started_only() observer_only() sender_origin() {
+        _observer_vote_for(address(tx.origin), CONTRACT_FAILED);
+        emit ObserverVote(payable(tx.origin), payable(address(0)), true);
     }
 
     // Informational functions
