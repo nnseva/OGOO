@@ -2810,6 +2810,111 @@ describe("Contract Tests", function () {
     }
   });
 
+  it("Test vote canceling", async function () {
+    console.log("Test contributor's vote canceling");
+    var test_definition = {
+        "caption": "Test",
+        "description": "Test Description",
+        "full_details": "Test Details",
+        "contribution_unlock_timeout": 1n,
+        "contribution_min_balance": 10000000000000000n,
+        "voting_start_balance": 0n,
+        "voting_start_count": 0n,
+        "voting_start_timeout": 3600n,
+        "voting_fail_timeout": 3600n,
+        "observers_vote_percent": 10000n,
+        "contributors_vote_percent": 10000n,
+        "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
+    };
+    var accounts = await hre.ethers.getSigners();
+    var account_owner = accounts[0];
+    var account_contributor = accounts[1];
+    var account_contender = accounts[2];
+    var account_observer = accounts[3];
+    var Offer = await ethers.getContractFactory("Offer", account_owner);
+    var offer = await Offer.deploy(test_definition);
+    await offer.waitForDeployment();
+    var contract_abi = require("../artifacts/contracts/ogoo.sol/Offer.json");
+
+    var o = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_owner,
+    );
+    var contributor_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor,
+    );
+    var observer_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_observer,
+    );
+    try {
+      await (await o.observer_create(account_observer.address)).wait(); 
+      await (await o.approve()).wait();
+      await (await account_contributor.sendTransaction({to:offer.target, value: 10000000000000000n})).wait();
+      await (await contributor_access.contributor_vote(account_contender.address)).wait();
+      (await contributor_access.origin_contributor_status())[1].should.be.equal(account_contender.address);
+
+      var voting_statistics = (await o.voting_statistics()).toObject();
+      voting_statistics.voted_contributors_percent.should.be.equal(10000n);
+      voting_statistics.voted_contributors_fund_percent.should.be.equal(10000n);
+      voting_statistics.voted_observers_percent.should.be.equal(0n);
+      voting_statistics.sorted_contributors_leaders.length.should.be.equal(1);
+      voting_statistics.sorted_contributors_leaders[0][0].should.be.equal(account_contender.address);
+      voting_statistics.sorted_contributors_leaders[0][1].should.be.equal(1n);
+      voting_statistics.sorted_contributors_fund_leaders.length.should.be.equal(1);
+      voting_statistics.sorted_contributors_fund_leaders[0][0].should.be.equal(account_contender.address);
+      voting_statistics.sorted_contributors_fund_leaders[0][1].should.be.equal(10000000000000000n);
+      voting_statistics.sorted_observers_leaders.length.should.be.equal(0);
+
+      await (await contributor_access.contributor_vote_cancel()).wait();
+      (await contributor_access.origin_contributor_status())[1].should.be.equal(ethers.ZeroAddress);
+
+      var voting_statistics = (await o.voting_statistics()).toObject();
+      voting_statistics.voted_contributors_percent.should.be.equal(0n);
+      voting_statistics.voted_contributors_fund_percent.should.be.equal(0n);
+      voting_statistics.voted_observers_percent.should.be.equal(0n);
+      voting_statistics.sorted_contributors_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_contributors_fund_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_observers_leaders.length.should.be.equal(0);
+
+      await (await observer_access.observer_vote(account_contender.address)).wait();
+      (await observer_access.origin_observer_status())[1].should.be.equal(account_contender.address);
+
+      var voting_statistics = (await o.voting_statistics()).toObject();
+      voting_statistics.voted_observers_percent.should.be.equal(10000n);
+      voting_statistics.voted_contributors_percent.should.be.equal(0n);
+      voting_statistics.sorted_contributors_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_contributors_fund_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_observers_leaders.length.should.be.equal(1);
+      voting_statistics.sorted_observers_leaders[0][0].should.be.equal(account_contender.address);
+      voting_statistics.sorted_observers_leaders[0][1].should.be.equal(1n);
+
+      await (await observer_access.observer_vote_cancel()).wait();
+      (await observer_access.origin_observer_status())[1].should.be.equal(ethers.ZeroAddress);
+
+      var voting_statistics = (await o.voting_statistics()).toObject();
+      voting_statistics.voted_contributors_percent.should.be.equal(0n);
+      voting_statistics.voted_contributors_fund_percent.should.be.equal(0n);
+      voting_statistics.voted_observers_percent.should.be.equal(0n);
+      voting_statistics.sorted_contributors_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_contributors_fund_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_observers_leaders.length.should.be.equal(0);
+    }
+    catch(e) {
+      if( e.data ) {
+        console.error("Unexpected revert", o.interface.parseError(e.data));
+      }
+      throw e;
+    }
+  });
+
   it("Test failed payout rolls completion state back", async function () {
     console.log("Test failed payout rolls completion state back");
     var test_definition = {

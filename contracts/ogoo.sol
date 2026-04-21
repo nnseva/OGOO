@@ -1243,6 +1243,9 @@ contract Offer {
 
     // Contributor voting for the contender's address
     function contributor_vote(address payable voice) external started_only() contributor_only() sender_origin() {
+        if( voice == address(0) ) {
+            revert WrongParameter();
+        }
         uint canceled_at = _contributor_canceled_at[address(tx.origin)];
         if( canceled_at != 0 ) {
             revert WrongState();
@@ -1259,9 +1262,21 @@ contract Offer {
         _contributor_vote_for(address(tx.origin), CONTRACT_FAILED);
         emit ContributorVote(payable(tx.origin), payable(address(0)), true);
     }
+    // Cancel the contributor voting for the contender's address
+    function contributor_vote_cancel() external started_only() contributor_only() sender_origin() {
+        uint canceled_at = _contributor_canceled_at[address(tx.origin)];
+        if( canceled_at != 0 ) {
+            revert WrongState();
+        }
+        _contributor_vote_for(address(tx.origin), 0);
+        emit ContributorVote(payable(tx.origin), payable(address(0)), false);
+    }
 
     // Observer voting for the contender's address
     function observer_vote(address payable voice) external started_only() observer_only() sender_origin() {
+        if( voice == address(0) ) {
+            revert WrongParameter();
+        }
         _observer_vote_for(address(tx.origin), uint256(uint160(address(voice))));
         emit ObserverVote(payable(tx.origin), voice, false);
     }
@@ -1269,6 +1284,11 @@ contract Offer {
     function observer_vote_failure() external started_only() observer_only() sender_origin() {
         _observer_vote_for(address(tx.origin), CONTRACT_FAILED);
         emit ObserverVote(payable(tx.origin), payable(address(0)), true);
+    }
+    // Cancel the observer voting for the contender's address
+    function observer_vote_cancel() external started_only() observer_only() sender_origin() {
+        _observer_vote_for(address(tx.origin), 0);
+        emit ObserverVote(payable(tx.origin), payable(address(0)), false);
     }
 
     // Informational functions
