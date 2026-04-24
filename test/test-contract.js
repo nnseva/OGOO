@@ -5,10 +5,32 @@ should();
 // TODO: test revoting for correct change leaders state
 // TODO: test CancelationInProgress
 
+// Helper functions
+
+var gas_price; // in Wei
+var wei_price; // in dollars
+
+// Get the real world price of wei and gas price from the open source price feed
+async function fetchPrice() {
+  if( typeof(gas_price) == 'undefined' || typeof(wei_price) == 'undefined' ) {
+    var price_data = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd').then(response => response.json());
+    wei_price = price_data.ethereum.usd / 10.**18; // Price of 1 wei in dollars
+    var gas_data = await fetch('https://api.owlracle.info/v4/eth/gas?eip1559=false').then(response => response.json());
+    var total_sum = 0;
+    for(var k in gas_data.speeds) {
+      total_sum += gas_data.speeds[k].gasPrice;
+    }
+    gas_price = BigInt(Math.floor(total_sum / Object.keys(gas_data.speeds).length * 10**9)); // Average gas price in wei
+    console.debug("Fetched price data: Gas price (WEI):", gas_price,  "Wei price ($):", wei_price);
+  }
+}
+
 function to$(wei) {
-  var cents_per_ether = 300000n;
-  var weis_per_ether = 1000000000000000000n;
-  return hre.ethers.toNumber((wei * cents_per_ether) / weis_per_ether ) / 100.;
+  return (hre.ethers.toNumber(wei / 10n**9n) * wei_price * 10.**9).toFixed(2);
+}
+
+function gasTo$ (gas) {
+  return to$(gas * gas_price);
 }
 
 function extractData(ex) {
@@ -33,6 +55,9 @@ const as_vote = function(voting) {
 }
 
 describe("Contract Tests", function () {
+  beforeEach(async function () {
+    await fetchPrice();
+  });
   it("Test the contract life circle main path", async function () {
     console.log("Test the contract life circle main path");
     var test_definition = {
@@ -48,6 +73,9 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var test_definition_values = [];
     for(var k in test_definition) {
@@ -63,11 +91,9 @@ describe("Contract Tests", function () {
     console.debug("Owner account at the beginning:", beginning_balance);
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     var contract_abi = require("../artifacts/contracts/ogoo.sol/Offer.json");
-    // Gas price and other fee data
-    var fee_data = await account_owner.provider.getFeeData();
     // Calculate gas for deployment
     var deployment_gas_price = await account_owner.estimateGas(await Offer.getDeployTransaction(test_definition));
-    console.debug("Projected deployment price:", deployment_gas_price, deployment_gas_price * fee_data.gasPrice, "Amount $:", to$(deployment_gas_price * fee_data.gasPrice));
+    console.debug("Projected deployment gas price:", deployment_gas_price, "Real world amount $:", gasTo$(deployment_gas_price));
     var start_balance = await account_owner.provider.getBalance(account_owner.address);
     console.debug("Owner account before deployment:", start_balance, start_balance - beginning_balance);
     // Start deployment, returning a promise that resolves to a contract object
@@ -86,15 +112,14 @@ describe("Contract Tests", function () {
     expect(offer_created_log).to.be.a('undefined');
     account_owner.provider.on(create_offer_filter, create_offer_handler);
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
     await new Promise(resolve => setTimeout(resolve, 1000));
     account_owner.provider.off(create_offer_filter, create_offer_handler);
     expect(offer_created_log).to.not.be.a('undefined');
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract owner is:", await offer.owner());
 
     // Gettings access from the owner
@@ -131,8 +156,6 @@ describe("Contract Tests", function () {
       contract_abi.abi,
       account_outside, // Outside account trying access to the contract
     )
-
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -329,6 +352,9 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -337,12 +363,11 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -385,7 +410,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -523,6 +547,9 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -531,12 +558,11 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -578,8 +604,6 @@ describe("Contract Tests", function () {
       contract_abi.abi,
       account_outside, // Outside account trying access to the contract
     )
-
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -680,6 +704,9 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -688,12 +715,11 @@ describe("Contract Tests", function () {
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -736,7 +762,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -888,6 +913,9 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -897,11 +925,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -944,7 +971,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1070,6 +1096,9 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1079,11 +1108,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1126,7 +1154,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1249,6 +1276,9 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1258,11 +1288,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1292,7 +1321,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1400,6 +1428,9 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
     var start_balance = await account_owner.provider.getBalance(account_owner.address);
@@ -1408,11 +1439,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1457,7 +1487,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1563,10 +1592,13 @@ describe("Contract Tests", function () {
         "voting_start_balance": 0n,
         "voting_start_count": 0n,
         "voting_start_timeout": 3600n,
-        "voting_fail_timeout": 20n,
+        "voting_fail_timeout": hre.network.name == 'local' ? 45n: 6n,
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1576,11 +1608,10 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    var v = await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     console.info("Contract deployed to address:", offer.target);
-    var end_balance = await account_owner.provider.getBalance(account_owner.address);
-    var diff = start_balance - end_balance;
-    console.debug("Owner account after deployment:", end_balance, "Diff WEI:", diff, "Amount $:", to$(diff));
     console.info("Contract owner is:", await offer.owner());
 
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1616,7 +1647,6 @@ describe("Contract Tests", function () {
       account_outside, // Outside account trying access to the contract
     )
 
-    await o.waitForDeployment();
     var owner = await o.owner();
     try {
       expect(owner).to.equal(account_owner.address);
@@ -1691,6 +1721,8 @@ describe("Contract Tests", function () {
     } catch(e) {
       if( e.data ) {
         console.error("Unexpected revert", o.interface.parseError(e.data));
+      } else {
+        console.error("Unknown revert", e);
       }
       throw e;
     }
@@ -1710,6 +1742,9 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 6000n,
         "contributors_vote_fund_percent": 0n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
@@ -1717,7 +1752,9 @@ describe("Contract Tests", function () {
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_tx = offer.deploymentTransaction();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -1818,14 +1855,19 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 0n,
         "contributors_vote_fund_percent": 5000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -1921,14 +1963,19 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 6000n,
         "contributors_vote_percent": 0n,
         "contributors_vote_fund_percent": 0n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -2039,14 +2086,19 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 3000n,
         "contributors_vote_percent": 3000n,
         "contributors_vote_fund_percent": 3000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     // Start deployment, returning a promise that resolves to a contract object
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -2148,13 +2200,18 @@ describe("Contract Tests", function () {
         "observers_vote_percent": 10000n,
         "contributors_vote_percent": 10000n,
         "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
     };
     var accounts = await hre.ethers.getSigners();
     var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
     var Offer = await ethers.getContractFactory("Offer", account_owner);
     var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
     console.info("Waiting for deployment...");
-    await offer.waitForDeployment();
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
     var owner = await offer.owner();
     console.info("Contract deployed to address:", offer.target);
     console.info("Contract owner is:", owner);
@@ -2398,6 +2455,638 @@ describe("Contract Tests", function () {
     } catch(e) {
       if( e.data ) {
         console.error("Unexpected revert", o.interface.parseError(extractData(e)));
+      }
+      throw e;
+    }
+  });
+
+  it("Test the contributors quorum", async function () {
+    console.log("Test the contributors quorum");
+    var test_definition = {
+        "caption": "Test",
+        "description": "Test Description",
+        "full_details": "Test Details",
+        "contribution_unlock_timeout": 1n,
+        "contribution_min_balance": 10000000000000000n,
+        "voting_start_balance": 0n,
+        "voting_start_count": 0n,
+        "voting_start_timeout": 3600n,
+        "voting_fail_timeout": 3600n,
+        "observers_vote_percent": 10000n,
+        "contributors_vote_percent": 10000n,
+        "contributors_vote_fund_percent": 0n,
+        "contributors_vote_quorum": 6000n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
+    };
+    var accounts = await hre.ethers.getSigners();
+    var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
+    var Offer = await ethers.getContractFactory("Offer", account_owner);
+    // Start deployment, returning a promise that resolves to a contract object
+    var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
+    console.info("Waiting for deployment...");
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
+    var owner = await offer.owner();
+    console.info("Contract deployed to address:", offer.target);
+    console.info("Contract owner is:", owner);
+    expect(owner).to.equal(account_owner.address);
+
+    var account_contributor1 = accounts[1]; // the account will be a signer to check an access from the contributor
+    var account_contributor2 = accounts[2]; // the account will be a signer to check an access from the contributor
+    var account_contributor3 = accounts[3]; // the account will be a signer to check an access from the contributor
+    var account_contender = accounts[4]; // the account will be a signer to check an access from the contender
+    var contract_abi = require("../artifacts/contracts/ogoo.sol/Offer.json");
+
+    // Gettings access from the owner
+    var o = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_owner, // Signer to get access to the contract
+    )
+
+    // Getting access from the contributor
+    var contributor1_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor1, // Contributor account trying access to the contract
+    )
+    var contributor2_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor2, // Contributor account trying access to the contract
+    )
+    var contributor3_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor3, // Contributor account trying access to the contract
+    )
+
+    // Getting access from the contender
+    var contender_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contender, // Contender account trying access to the contract
+    )
+    try {
+      // Approve the contract to make it unmutable
+      await (await o.approve()).wait();
+
+      // test the contributor created an account sending there enough amount
+      await (await account_contributor1.sendTransaction({to:offer.target, value: 10000000000000001n})).wait();
+      await (await account_contributor2.sendTransaction({to:offer.target, value: 20000000000000001n})).wait();
+      await (await account_contributor3.sendTransaction({to:offer.target, value: 30000000000000003n})).wait();
+      (await contributor1_access.origin_contributor_status())[2].should.be.equal(10000000000000001n);
+      (await contributor2_access.origin_contributor_status())[2].should.be.equal(20000000000000001n);
+      (await contributor3_access.origin_contributor_status())[2].should.be.equal(30000000000000003n);
+
+      // voting process
+      var state = await contender_access.state();
+      console.log('State before first vote', state);
+      state.should.be.equal(1n);
+
+      var start_balance_contender = await account_contender.provider.getBalance(account_contender.address);
+      console.debug("Contender account before contract success:", start_balance_contender);
+      await (await contributor3_access.contributor_vote(account_contender.address)).wait();
+      console.debug("The first contributor has just voted");
+      state = await contender_access.state();
+      console.log('State after the first contributors vote', state)
+      state.should.be.equal(1n);
+      await (await contributor1_access.contributor_vote(account_contender.address)).wait();
+      console.debug("The second contributor has just voted");
+      state = await contender_access.state();
+      console.log('State after second contributors vote', state)
+      state.should.be.equal(2n);
+
+      var final_balance_offer = await account_owner.provider.getBalance(offer.target);
+      console.debug("Offer account after contract completion", final_balance_offer);
+      final_balance_offer.should.be.equal(0n);
+
+      var end_balance_contender = await account_contender.provider.getBalance(account_contender.address);
+      console.debug("Contender account after contract success:", end_balance_contender);
+      console.debug("Contender account diff after contract success ($):", to$(end_balance_contender - start_balance_contender));
+    } catch(e) {
+      if( e.data ) {
+        console.error("Unexpected revert", o.interface.parseError(e.data));
+      }
+      throw e;
+    }
+  });
+  it("Test the contributors fund quorum", async function () {
+    console.log("Test the contributors fund quorum");
+    var test_definition = {
+        "caption": "Test",
+        "description": "Test Description",
+        "full_details": "Test Details",
+        "contribution_unlock_timeout": 1n,
+        "contribution_min_balance": 10000000000000000n,
+        "voting_start_balance": 0n,
+        "voting_start_count": 0n,
+        "voting_start_timeout": 3600n,
+        "voting_fail_timeout": 3600n,
+        "observers_vote_percent": 0n,
+        "contributors_vote_percent": 0n,
+        "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 6000n,
+        "observers_vote_quorum": 0n,
+    };
+    var accounts = await hre.ethers.getSigners();
+    var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
+    var Offer = await ethers.getContractFactory("Offer", account_owner);
+    // Start deployment, returning a promise that resolves to a contract object
+    var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
+    console.info("Waiting for deployment...");
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
+    var owner = await offer.owner();
+    console.info("Contract deployed to address:", offer.target);
+    console.info("Contract owner is:", owner);
+    expect(owner).to.equal(account_owner.address);
+
+    var account_contributor1 = accounts[1]; // the account will be a signer to check an access from the contributor
+    var account_contributor2 = accounts[2]; // the account will be a signer to check an access from the contributor
+    var account_contributor3 = accounts[3]; // the account will be a signer to check an access from the contributor
+    var account_contender = accounts[4]; // the account will be a signer to check an access from the contender
+    var contract_abi = require("../artifacts/contracts/ogoo.sol/Offer.json");
+
+    // Gettings access from the owner
+    var o = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_owner, // Signer to get access to the contract
+    )
+
+    // Getting access from the contributor
+    var contributor1_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor1, // Contributor account trying access to the contract
+    )
+    var contributor2_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor2, // Contributor account trying access to the contract
+    )
+    var contributor3_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor3, // Contributor account trying access to the contract
+    )
+
+    // Getting access from the contender
+    var contender_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contender, // Contender account trying access to the contract
+    )
+    try {
+      // Approve the contract to make it unmutable
+      await (await o.approve()).wait();
+
+      // test the contributor created an account sending there enough amount
+      await (await account_contributor1.sendTransaction({to:offer.target, value: 10000000000000001n})).wait();
+      await (await account_contributor2.sendTransaction({to:offer.target, value: 20000000000000001n})).wait();
+      await (await account_contributor3.sendTransaction({to:offer.target, value: 30000000000000003n})).wait();
+      (await contributor1_access.origin_contributor_status())[2].should.be.equal(10000000000000001n);
+      (await contributor2_access.origin_contributor_status())[2].should.be.equal(20000000000000001n);
+      (await contributor3_access.origin_contributor_status())[2].should.be.equal(30000000000000003n);
+
+      // voting process
+      var state = await contender_access.state();
+      console.log('State before first vote', state);
+      state.should.be.equal(1n);
+
+      var start_balance_contender = await account_contender.provider.getBalance(account_contender.address);
+      console.debug("Contender account before contract success:", start_balance_contender);
+      await (await contributor3_access.contributor_vote(account_contender.address)).wait();
+      console.debug("The most valuable contributor has just voted");
+      state = await contender_access.state();
+      console.log('State after the most valuable contributor vote', state)
+      state.should.be.equal(1n);
+      await (await contributor1_access.contributor_vote(account_contender.address)).wait();
+      console.debug("The least valuable contributor has just voted");
+      state = await contender_access.state();
+      console.log('State after the least valuable contributor vote', state)
+      state.should.be.equal(2n);
+
+      var final_balance_offer = await account_owner.provider.getBalance(offer.target);
+      console.debug("Offer account after contract completion", final_balance_offer);
+      final_balance_offer.should.be.equal(0n);
+
+      var end_balance_contender = await account_contender.provider.getBalance(account_contender.address);
+      console.debug("Contender account after contract success:", end_balance_contender);
+      console.debug("Contender account diff after contract success ($):", to$(end_balance_contender - start_balance_contender));
+    } catch(e) {
+      if( e.data ) {
+        console.error("Unexpected revert", o.interface.parseError(e.data));
+      }
+      throw e;
+    }
+  });
+  it("Test the observers quorum", async function () {
+    console.log("Test the observers quorum");
+    var test_definition = {
+        "caption": "Test",
+        "description": "Test Description",
+        "full_details": "Test Details",
+        "contribution_unlock_timeout": 1n,
+        "contribution_min_balance": 10000000000000000n,
+        "voting_start_balance": 0n,
+        "voting_start_count": 0n,
+        "voting_start_timeout": 3600n,
+        "voting_fail_timeout": 3600n,
+        "observers_vote_percent": 10000n,
+        "contributors_vote_percent": 0n,
+        "contributors_vote_fund_percent": 0n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 6000n,
+    };
+    var accounts = await hre.ethers.getSigners();
+    var account_owner = accounts[0]; // the first account will be a signer to check an access from the owner
+    var Offer = await ethers.getContractFactory("Offer", account_owner);
+    // Start deployment, returning a promise that resolves to a contract object
+    var offer = await Offer.deploy(test_definition);
+    var deployment_tx = offer.deploymentTransaction();
+    console.info("Waiting for deployment...");
+    var deployment_receipt = await deployment_tx.wait();
+    console.debug("Actual deployment gas price:", deployment_receipt.gasUsed, "Real world amount $:", gasTo$(deployment_receipt.gasUsed));
+    var owner = await offer.owner();
+    console.info("Contract deployed to address:", offer.target);
+    console.info("Contract owner is:", owner);
+    expect(owner).to.equal(account_owner.address);
+
+    var account_contributor1 = accounts[1]; // the account will be a signer to check an access from the contributor
+    var account_contributor2 = accounts[2]; // the account will be a signer to check an access from the contributor
+    var account_contributor3 = accounts[3]; // the account will be a signer to check an access from the contributor
+    var account_contender = accounts[4]; // the account will be a signer to check an access from the contender
+    var contract_abi = require("../artifacts/contracts/ogoo.sol/Offer.json");
+
+    // Gettings access from the owner
+    var o = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_owner, // Signer to get access to the contract
+    )
+
+    // Getting access from the contributor
+    var contributor1_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor1, // Contributor account trying access to the contract
+    )
+    var contributor2_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor2, // Contributor account trying access to the contract
+    )
+    var contributor3_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor3, // Contributor account trying access to the contract
+    )
+
+    // Getting access from the contender
+    var contender_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contender, // Contender account trying access to the contract
+    )
+    try {
+      // Contributors also will be observers
+      await (await o.observer_create(account_contributor1.address)).wait();
+      await (await o.observer_create(account_contributor2.address)).wait();
+      await (await o.observer_create(account_contributor3.address)).wait();
+
+      // Approve the contract to make it unmutable
+      await (await o.approve()).wait();
+
+      // test the contributor created an account sending there enough amount
+      await (await account_contributor1.sendTransaction({to:offer.target, value: 10000000000000001n})).wait();
+      await (await account_contributor2.sendTransaction({to:offer.target, value: 20000000000000001n})).wait();
+      await (await account_contributor3.sendTransaction({to:offer.target, value: 30000000000000003n})).wait();
+      (await contributor1_access.origin_contributor_status())[2].should.be.equal(10000000000000001n);
+      (await contributor2_access.origin_contributor_status())[2].should.be.equal(20000000000000001n);
+      (await contributor3_access.origin_contributor_status())[2].should.be.equal(30000000000000003n);
+
+      // voting process
+      var state = await contender_access.state();
+      console.log('State before first vote', state);
+      state.should.be.equal(1n);
+
+      var start_balance_contender = await account_contender.provider.getBalance(account_contender.address);
+      console.debug("Contender account before contract success:", start_balance_contender);
+      await (await contributor3_access.contributor_vote(account_contender.address)).wait();
+      console.debug("The most valuable contributor has just voted");
+      state = await contender_access.state();
+      console.log('State after contributors vote', state)
+      state.should.be.equal(1n);
+      await (await contributor1_access.observer_vote(account_contender.address)).wait();
+      console.debug("The first observer has just voted");
+      state = await contender_access.state();
+      console.log('State after the first observer vote', state)
+      state.should.be.equal(1n);
+      await (await contributor2_access.observer_vote(account_contender.address)).wait();
+      console.debug("The second observer has just voted");
+      state = await contender_access.state();
+      console.log('State after the second observer vote', state)
+      state.should.be.equal(2n);
+
+      var final_balance_offer = await account_owner.provider.getBalance(offer.target);
+      console.debug("Offer account after contract completion", final_balance_offer);
+      final_balance_offer.should.be.equal(0n);
+
+      var end_balance_contender = await account_contender.provider.getBalance(account_contender.address);
+      console.debug("Contender account after contract success:", end_balance_contender);
+      console.debug("Contender account diff after contract success ($):", to$(end_balance_contender - start_balance_contender));
+    } catch(e) {
+      if( e.data ) {
+        console.error("Unexpected revert", o.interface.parseError(e.data));
+      }
+      throw e;
+    }
+  });
+
+  it("Test vote canceling", async function () {
+    console.log("Test contributor's vote canceling");
+    var test_definition = {
+        "caption": "Test",
+        "description": "Test Description",
+        "full_details": "Test Details",
+        "contribution_unlock_timeout": 1n,
+        "contribution_min_balance": 10000000000000000n,
+        "voting_start_balance": 0n,
+        "voting_start_count": 0n,
+        "voting_start_timeout": 3600n,
+        "voting_fail_timeout": 3600n,
+        "observers_vote_percent": 10000n,
+        "contributors_vote_percent": 10000n,
+        "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
+    };
+    var accounts = await hre.ethers.getSigners();
+    var account_owner = accounts[0];
+    var account_contributor = accounts[1];
+    var account_contender = accounts[2];
+    var account_observer = accounts[3];
+    var Offer = await ethers.getContractFactory("Offer", account_owner);
+    var offer = await Offer.deploy(test_definition);
+    await offer.waitForDeployment();
+    var contract_abi = require("../artifacts/contracts/ogoo.sol/Offer.json");
+
+    var o = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_owner,
+    );
+    var contributor_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor,
+    );
+    var observer_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_observer,
+    );
+    try {
+      await (await o.observer_create(account_observer.address)).wait(); 
+      await (await o.approve()).wait();
+      await (await account_contributor.sendTransaction({to:offer.target, value: 10000000000000000n})).wait();
+      await (await contributor_access.contributor_vote(account_contender.address)).wait();
+      (await contributor_access.origin_contributor_status())[1].should.be.equal(account_contender.address);
+
+      var voting_statistics = (await o.voting_statistics()).toObject();
+      voting_statistics.voted_contributors_percent.should.be.equal(10000n);
+      voting_statistics.voted_contributors_fund_percent.should.be.equal(10000n);
+      voting_statistics.voted_observers_percent.should.be.equal(0n);
+      voting_statistics.sorted_contributors_leaders.length.should.be.equal(1);
+      voting_statistics.sorted_contributors_leaders[0][0].should.be.equal(account_contender.address);
+      voting_statistics.sorted_contributors_leaders[0][1].should.be.equal(1n);
+      voting_statistics.sorted_contributors_fund_leaders.length.should.be.equal(1);
+      voting_statistics.sorted_contributors_fund_leaders[0][0].should.be.equal(account_contender.address);
+      voting_statistics.sorted_contributors_fund_leaders[0][1].should.be.equal(10000000000000000n);
+      voting_statistics.sorted_observers_leaders.length.should.be.equal(0);
+
+      await (await contributor_access.contributor_vote_cancel()).wait();
+      (await contributor_access.origin_contributor_status())[1].should.be.equal(ethers.ZeroAddress);
+
+      var voting_statistics = (await o.voting_statistics()).toObject();
+      voting_statistics.voted_contributors_percent.should.be.equal(0n);
+      voting_statistics.voted_contributors_fund_percent.should.be.equal(0n);
+      voting_statistics.voted_observers_percent.should.be.equal(0n);
+      voting_statistics.sorted_contributors_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_contributors_fund_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_observers_leaders.length.should.be.equal(0);
+
+      await (await observer_access.observer_vote(account_contender.address)).wait();
+      (await observer_access.origin_observer_status())[1].should.be.equal(account_contender.address);
+
+      var voting_statistics = (await o.voting_statistics()).toObject();
+      voting_statistics.voted_observers_percent.should.be.equal(10000n);
+      voting_statistics.voted_contributors_percent.should.be.equal(0n);
+      voting_statistics.sorted_contributors_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_contributors_fund_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_observers_leaders.length.should.be.equal(1);
+      voting_statistics.sorted_observers_leaders[0][0].should.be.equal(account_contender.address);
+      voting_statistics.sorted_observers_leaders[0][1].should.be.equal(1n);
+
+      await (await observer_access.observer_vote_cancel()).wait();
+      (await observer_access.origin_observer_status())[1].should.be.equal(ethers.ZeroAddress);
+
+      var voting_statistics = (await o.voting_statistics()).toObject();
+      voting_statistics.voted_contributors_percent.should.be.equal(0n);
+      voting_statistics.voted_contributors_fund_percent.should.be.equal(0n);
+      voting_statistics.voted_observers_percent.should.be.equal(0n);
+      voting_statistics.sorted_contributors_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_contributors_fund_leaders.length.should.be.equal(0);
+      voting_statistics.sorted_observers_leaders.length.should.be.equal(0);
+    }
+    catch(e) {
+      if( e.data ) {
+        console.error("Unexpected revert", o.interface.parseError(e.data));
+      }
+      throw e;
+    }
+  });
+
+  it("Test failed payout rolls completion state back", async function () {
+    console.log("Test failed payout rolls completion state back");
+    var test_definition = {
+        "caption": "Test",
+        "description": "Test Description",
+        "full_details": "Test Details",
+        "contribution_unlock_timeout": 1n,
+        "contribution_min_balance": 30000000000000000n,
+        "voting_start_balance": 0n,
+        "voting_start_count": 0n,
+        "voting_start_timeout": 3600n,
+        "voting_fail_timeout": 3600n,
+        "observers_vote_percent": 10000n,
+        "contributors_vote_percent": 10000n,
+        "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
+    };
+    var accounts = await hre.ethers.getSigners();
+    var account_owner = accounts[0];
+    var account_observer = accounts[1];
+    var account_contributor = accounts[2];
+    var Offer = await ethers.getContractFactory("Offer", account_owner);
+    var RejectEtherReceiver = await ethers.getContractFactory("RejectEtherReceiver", account_owner);
+    var reject_receiver = await RejectEtherReceiver.deploy();
+    await reject_receiver.waitForDeployment();
+    var offer = await Offer.deploy(test_definition);
+    await offer.waitForDeployment();
+    var contract_abi = require("../artifacts/contracts/ogoo.sol/Offer.json");
+
+    var o = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_owner,
+    );
+    var observer_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_observer,
+    );
+    var contributor_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor,
+    );
+
+    try {
+      await (await o.observer_create(account_observer.address)).wait();
+      await (await o.approve()).wait();
+      await (await account_contributor.sendTransaction({to:offer.target, value:30000000000000001n})).wait();
+
+      var initial_offer_balance = await account_owner.provider.getBalance(offer.target);
+      initial_offer_balance.should.be.equal(30000000000000001n);
+
+      await (await contributor_access.contributor_vote(reject_receiver.target)).wait();
+      await (await observer_access.observer_vote(reject_receiver.target)).wait();
+
+      (await o.state()).should.be.equal(1n);
+      (await o.completed_at()).should.be.equal(0n);
+      expect(await o.winner()).to.equal(ethers.ZeroAddress);
+
+      var final_offer_balance = await account_owner.provider.getBalance(offer.target);
+      final_offer_balance.should.be.equal(initial_offer_balance);
+
+      var reject_receiver_balance = await account_owner.provider.getBalance(reject_receiver.target);
+      reject_receiver_balance.should.be.equal(0n);
+
+      {
+          var events = await o.queryFilter(o.filters.OfferCompleted());
+          events.length.should.be.equal(0);
+      }
+      {
+        var events = await o.queryFilter(o.filters.OfferPayoutFailed());
+        events.length.should.be.equal(1);
+        expect(events[0].args).to.deep.equal([reject_receiver.target, initial_offer_balance]);
+      }
+      {
+          var events = await o.queryFilter(o.filters.ObserverVote());
+          events.length.should.be.equal(1);
+          expect(events[0].args).to.deep.equal([account_observer.address,reject_receiver.target,false]);
+      }
+    } catch(e) {
+      if( e.data ) {
+        console.error("Unexpected revert", o.interface.parseError(e.data));
+      }
+      throw e;
+    }
+  });
+
+  it("Test voting start thresholds are latched on the crossing transaction", async function () {
+    console.log("Test voting start thresholds are latched on the crossing transaction");
+    var test_definition = {
+        "caption": "Test",
+        "description": "Test Description",
+        "full_details": "Test Details",
+        "contribution_unlock_timeout": 120n,
+        "contribution_min_balance": 10000000000000000n,
+        "voting_start_balance": 50000000000000000n,
+        "voting_start_count": 2n,
+        "voting_start_timeout": 3600n,
+        "voting_fail_timeout": 3600n,
+        "observers_vote_percent": 10000n,
+        "contributors_vote_percent": 10000n,
+        "contributors_vote_fund_percent": 10000n,
+        "contributors_vote_quorum": 0n,
+        "contributors_vote_fund_quorum": 0n,
+        "observers_vote_quorum": 0n,
+    };
+    var accounts = await hre.ethers.getSigners();
+    var account_owner = accounts[0];
+    var account_contributor = accounts[1];
+    var account_contributor2 = accounts[2];
+    var Offer = await ethers.getContractFactory("Offer", account_owner);
+    var offer = await Offer.deploy(test_definition);
+    await offer.waitForDeployment();
+    var contract_abi = require("../artifacts/contracts/ogoo.sol/Offer.json");
+
+    var o = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_owner,
+    );
+    var contributor_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor,
+    );
+    var contributor2_access = new ethers.Contract(
+      offer.target,
+      contract_abi.abi,
+      account_contributor2,
+    );
+
+    try {
+      (await o.voting_started_at()).should.be.equal(0n);
+      await (await o.approve()).wait();
+      (await o.voting_started_at()).should.be.equal(0n);
+
+      await (await account_contributor.sendTransaction({to:offer.target, value:20000000000000000n})).wait();
+      (await o.voting_started_at()).should.be.equal(0n);
+
+      await (await account_contributor2.sendTransaction({to:offer.target, value:10000000000000000n})).wait();
+      (await o.voting_started_at()).should.be.equal(0n);
+
+      var crossing_tx = await account_contributor.sendTransaction({to:offer.target, value:20000000000000000n});
+      var crossing_receipt = await crossing_tx.wait();
+      var crossing_block = await hre.ethers.provider.getBlock(crossing_receipt.blockNumber);
+      var voting_started_at = await o.voting_started_at();
+      voting_started_at.should.be.equal(BigInt(crossing_block.timestamp));
+
+      await (await contributor2_access.contribution_cancel()).wait();
+
+      (await o.voting_started_at()).should.be.equal(voting_started_at);
+
+      {
+          var contributor1_status = await contributor_access.origin_contributor_status();
+          contributor1_status[2].should.be.equal(40000000000000000n);
+      }
+      {
+          var contributor2_status = await contributor2_access.origin_contributor_status();
+          contributor2_status[2].should.be.equal(10000000000000000n);
+          contributor2_status[3].should.not.be.equal(0n);
+      }
+      {
+          var voting_statistics = await o.voting_statistics();
+          voting_statistics[1].should.be.equal(1n);
+          voting_statistics[2].should.be.equal(40000000000000000n);
+      }
+    } catch(e) {
+      if( e.data ) {
+        console.error("Unexpected revert", o.interface.parseError(e.data));
       }
       throw e;
     }

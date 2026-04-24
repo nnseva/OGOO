@@ -7,6 +7,7 @@
 - [Offer Definition](OfferDefinition.md)
 - [Offer Contract API](OfferContractAPI.md) ⏴ *this page*
 - [How To Test](HOWTOTEST.md)
+- [User Guide](html/USER-GUIDE.en.md) [ru](html/USER-GUIDE.ru.md)
 
 ## 📖 Introduction
 
@@ -77,9 +78,10 @@ event OfferFailed();
 - `ContributionUpdated(address payable indexed contributor, uint amount)` – Emitted when an existing contributor increases their contribution; reflects the total contributed amount.
 - `ContributionCancelation(address payable indexed contributor)` – Emitted when a contributor initiates a refund request.
 - `ContributionCanceled(address payable indexed contributor)` – Emitted when a contributor receives a refund after the unlock timeout expires.
+- `ContributorVote(address payable indexed contributor, address payable contender, bool failure)` – Emitted when a contributor casts a vote. The `failure` flag means voting for failure. Zero `address` together with `failure=false` means canceling the vote.
+- `ObserverVote(address payable indexed observer, address payable contender, bool failure)` – Emitted when an observer casts a vote. The `failure` flag means voting for failure. Zero `address` together with `failure=false` means canceling the vote.
 - `OfferCompleted(address payable winner, uint amount)` – Emitted when the Offer is successfully completed and funds are transferred to the contender.
-- `ContributorVote(address payable indexed contributor, address payable contender, bool failure)` – Emitted when a contributor casts a vote.
-- `ObserverVote(address payable indexed observer, address payable contender, bool failure)` – Emitted when an observer casts a vote.
+- `OfferPayoutFailed()` - Emitted if the payout to the winner's account has failed for any reason, the offer doesn't change it's status.
 - `OfferFailed()` – Emitted when the Offer fails.
 
 ## 🛡️ Modifiers
@@ -174,19 +176,25 @@ function contributor_vote(address payable voice) external started_only() contrib
 ```solidity
 function contributor_vote_failure() external started_only() contributor_only() sender_origin()
 ```
+```solidity
+function contributor_vote_cancel() external started_only() contributor_only() sender_origin()
+```
 
-Contributors can vote for a contender or indicate Offer failure. Votes may be changed until the Offer is finalized.
+Contributors can vote for a contender, indicate Offer failure, or cancel the vote. Votes may be changed until the Offer is finalized.
 
 ## 🗳️ Observer Voting Methods
 
 ```solidity
-function observer_vote(address payable voice) external started_only() observer_only()
+function observer_vote(address payable voice) external started_only() observer_only() sender_origin()
 ```
 ```solidity
-function observer_vote_failure() external started_only() observer_only()
+function observer_vote_failure() external started_only() observer_only() sender_origin()
+```
+```solidity
+function observer_vote_cancel() external started_only() observer_only() sender_origin()
 ```
 
-Observers can vote for a contender or indicate Offer failure, with the option to change their vote until the Offer is finalized.
+Observers can vote for a contender, indicate Offer failure, or cancel the vote, with the option to change their vote until the Offer is finalized.
 
 ## 📊 Public Variables
 
@@ -266,7 +274,7 @@ var contender = ethers.toBeHex(failure ? 0n : voting, 20);
 ```
 This extracts the contender’s address as a hexadecimal string, or returns `0x00...00` if the vote was for failure.
 
-### 👁️‍🗨️ Origin Observer Status
+### 👁 Origin Observer Status
 
 Returns whether the transaction origin is a registered observer and, if so, provides the current voting status of that observer.
 
@@ -297,7 +305,7 @@ function origin_contributor_status() external view sender_origin() returns(
 - `canceled_at` – the block timestamp of the cancellation request, or `0` if no request has been made.
 - `contribution_cancelation_timeout` – time in seconds remaining until the contributor can reclaim their funds. Returns `0` if no cancellation request exists or if the timeout has already expired.
 
-### 👁️‍🗨️ Observers List
+### 👁 Observers List
 
 Returns the complete list of registered observer addresses.
 

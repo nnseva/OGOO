@@ -11,7 +11,7 @@ $(async function() {
     const WeiSymbol = 'w';
 
     const CONTRACT_FAILED = 1n << 255n;
-    
+
     const etherUnits = [
         WeiSymbol,
         'K' + WeiSymbol,
@@ -25,6 +25,20 @@ $(async function() {
         'G' + ethers.EtherSymbol,
         'T' + ethers.EtherSymbol,
     ]
+
+    const etherUnitNames = createMap(
+        WeiSymbol, 'Wei',
+        'K' + WeiSymbol, 'KiloWei',
+        'M' + WeiSymbol, 'MegaWei',
+        'G' + WeiSymbol, 'GigaWei',
+        'mk' + ethers.EtherSymbol, 'MicroEther',
+        'm' + ethers.EtherSymbol, 'MilliEther',
+        ethers.EtherSymbol, 'Ether',
+        'K' + ethers.EtherSymbol, 'KiloEther',
+        'M' + ethers.EtherSymbol, 'MegaEther',
+        'G' + ethers.EtherSymbol, 'GigaEther',
+        'T' + ethers.EtherSymbol, 'TeraEther'
+    );
 
     const timeUnits = {
         'sec': 1,
@@ -127,6 +141,65 @@ $(async function() {
         return ret;
     };
 
+    // Read Ether price from open API and store in localStorage
+    const fetchEtherPrice = async function(callback) {
+        var price = localStorage.getItem('ogoo_eth_price');
+        var price_timestamp = localStorage.getItem('ogoo_eth_price_timestamp');
+        if(price_timestamp) {
+            price_timestamp = parseInt(price_timestamp);
+            var now = Date.now();
+            if(now - price_timestamp < 10 * 60 * 1000) {
+                if(callback) {
+                    callback(price);
+                }
+                return;
+            }
+        }
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
+            const data = await response.json();
+            const price = data.ethereum.usd;
+            localStorage.setItem('ogoo_eth_price', price);
+            localStorage.setItem('ogoo_eth_price_timestamp', Date.now().toString());
+            if(callback) {
+                callback(price);
+            }
+        } catch (ex) {
+            console.error('Error fetching Ether price from API', ex);
+        }
+    };
+
+    const etherToUSD = function(amount, callback) {
+        // returns approximate USD value of the given amount of Wei, based on the current Ether price
+        // Note: this is a very rough estimation, as it does not account for the time of the price
+        // retrieval and the price volatility. It is recommended to use this function only for display purposes,
+        // and not for any critical calculations.
+        fetchEtherPrice(function(price) {  // Refresh the price in the background if necessary
+            try {
+                price = parseFloat(price);
+                var amountEther = parseFloat(ethers.formatEther(amount));
+                if(callback) {
+                    callback((amountEther * price).toFixed(2));
+                }
+            } catch(ex) {
+                console.error('Error parsing Ether price from localStorage', price, ex);
+                if(callback) {
+                    callback(null);
+                }
+            }
+        });
+    }
+
+    const shortenedAddress = function(address) {
+        return address.substr(0, 6) + '...' + address.substr(-4);
+    }
+
+    const roundedAmount = function(amount, decimals=4) {
+        var splitted = bigIntSplit(amount, 1);
+        splitted = bigIntSplitRound(splitted, splitted.length - decimals, 1);
+        return bigIntUnsplit(splitted, 1);
+    }
+
     const convertToWei = function(value, unit_index=0) {
         var sint, sfrac;
         [sint, sfrac] = value.toString().split('.');
@@ -193,9 +266,141 @@ $(async function() {
         return `${data.name}(${data.args.join(', ')})`;
     };
 
+    // Language Support
+    let currentLang = 'en'; // Default to English
+
+    // External variable `translations`
+    const translateElement = function(element, message) {
+        if(typeof(message) == 'string') {
+            if($(element).text() != message)
+                $(element).text(message);
+        } else {
+            if(message.text) {
+                $(element).text(message.text);
+            }
+            if(message.html) {
+                $(element).html(message.html);
+            }
+            for(var attr in message) {
+                if(attr == 'text' || attr == 'html')
+                    continue;
+                if($(element).attr(attr) != message[attr])
+                    $(element).attr(attr, message[attr]);
+            }
+        }
+        return element;
+    };
+
+    const translateTree = function(element) {
+        const lang = localStorage.getItem('ogoo_lang');
+        $(element).find('[data-t]').each(function() {
+            const key = $(this).data('t');
+            if (translations[lang] && translations[lang][key]) {
+                translateElement(this, translations[lang][key]);
+            }
+        });
+        return element;
+    }
+
+    const translateHTML = function(html) {
+        var root = $('<div></div>');
+        root.html(html);
+        translateTree(root[0]);
+        return root.html();
+    }
+
+    const updateLanguage = function(lang) {
+        currentLang = lang;
+        $('[data-lang]').removeClass('active');
+        $(`[data-lang="${lang}"]`).addClass('active');
+        $('#langSelector').html(`<i class="bi bi-translate me-1"></i> ${lang.toUpperCase()}`);
+        localStorage.setItem('ogoo_lang', lang);
+        translateTree(document);
+    };
+
+    // Product Tour Logic
+    const startProductTour = function() {
+        const tour = introJs();
+        const steps = currentLang === 'ru' ? [
+            {
+                title: 'Добро пожаловать в OGOO!',
+                intro: 'Давайте быстро разберем, как работает платформа.'
+            },
+            {
+                element: '#tour-offers',
+                intro: 'Здесь вы можете найти список всех доступных предложений или добавить существующий контракт по адресу.'
+            },
+            {
+                element: '#tour-contributions',
+                intro: 'Управляйте своими вкладами и создавайте новые инвестиции в фонды влияния.'
+            },
+            {
+                element: '#tour-create-offer',
+                intro: 'Нажмите сюда, чтобы запустить собственный фонд и предложить задачу сообществу.'
+            },
+            {
+                element: '#tour-stats-offers',
+                intro: 'Ваша личная статистика: сколько офферов вы отслеживаете в данный момент.'
+            }
+        ] : [
+            {
+                title: 'Welcome to OGOO!',
+                intro: 'Let\'s quickly walk through how the platform works.'
+            },
+            {
+                element: '#tour-offers',
+                intro: 'Here you can find a list of all available offers or add an existing contract by address.'
+            },
+            {
+                element: '#tour-contributions',
+                intro: 'Manage your contributions and create new investments in impact funds.'
+            },
+            {
+                element: '#tour-create-offer',
+                intro: 'Click here to launch your own fund and propose a task to the community.'
+            },
+            {
+                element: '#tour-stats-offers',
+                intro: 'Your personal statistics: how many offers you are currently tracking.'
+            }
+        ];
+
+        tour.setOptions({
+            steps: steps,
+            showProgress: true,
+            showBullets: false,
+            nextLabel: currentLang === 'ru' ? 'Далее' : 'Next',
+            prevLabel: currentLang === 'ru' ? 'Назад' : 'Prev',
+            doneLabel: currentLang === 'ru' ? 'Готово' : 'Done'
+        }).start();
+    };
+
+    $(document).on('click', '[data-lang]', function(e) {
+        e.preventDefault();
+        updateLanguage($(this).data('lang'));
+    });
+
+    $(document).on('click', '#start-tour', function(e) {
+        e.preventDefault();
+        startProductTour();
+    });
+
+    // Initialize language on load
+    const detectLanguage = function() {
+        const saved = localStorage.getItem('ogoo_lang');
+        if (saved) return saved;
+        
+        const browserLang = (navigator.language || navigator.userLanguage).toLowerCase();
+        if (browserLang.startsWith('ru')) return 'ru';
+        
+        return 'en'; // Default
+    };
+    
+    updateLanguage(detectLanguage());
+
     const get_database = async function() {
         return await new Promise(function(resolve, reject) {
-            var request = indexedDB.open('ogoo', 1);
+            var request = indexedDB.open('ogoo.v.3', 1);
             request.onerror = (ex) => {
                 console.error('Error open ogoo database', ex);
                 bootstrap.Modal.getOrCreateInstance($('#no-database')[0], {
@@ -295,7 +500,7 @@ $(async function() {
         $(document).find('.tab-pane').add(
             $('[data-bs-toggle="tab"]')
         ).add(
-            $(`.nav-item a`)            
+            $(`.nav-item a`)
         ).removeClass('active show');
         var parents$ = pane$.parents('.tab-pane');
         parents$.add(
@@ -394,27 +599,45 @@ $(async function() {
         var observed = 0;
         var owned = 0;
 
-        var offer_list_tbody = $('#offers-list tbody');
-        offer_list_tbody.html('');
-        var contribution_list_tbody = $('#contributions-list tbody');
-        contribution_list_tbody.html('');
-        var observing_list_tbody = $('#observing-list tbody');
-        observing_list_tbody.html('');
-        var managed_list_tbody = $('#managed-offers-list tbody');
-        managed_list_tbody.html('');
+        var offer_list_container = $('#offers-container');
+        offer_list_container.html('');
+        var contribution_list_container = $('#contributions-container');
+        contribution_list_container.html('');
+        var observing_list_container = $('#observing-container');
+        observing_list_container.html('');
+        var managed_list_container = $('#managed-container');
+        managed_list_container.html('');
         offer_records.map(function(offer_record) {
             var offer_list_row = $($('#offer-list-row').text());
-            offer_list_row.find('.offer-list-row-address').text(offer_record.id);
-            offer_list_row.find('.offer-list-row-name').text(offer_record.definition.caption);
-            var offer_list_row_icon_box = offer_list_row.find('.offer-list-row-icon-box');
+            offer_list_row.find('.offer-address').text(offer_record.id);
+            offer_list_row.find('.offer-title').text(offer_record.definition.caption);
+            var offer_list_row_icon_box = offer_list_row.find('.offer-icon-box');
 
             if(offer_record.is_owner) {
                 owned += 1;
                 offer_list_row_icon_box.append($($('#icon-owner').text()));
 
                 var managed_list_row = $($('#managed-list-row').text());
-                managed_list_row.find('.managed-list-row-address').text(offer_record.id);
-                managed_list_row.find('.managed-list-row-name').text(offer_record.definition.caption);
+                managed_list_row.find('.offer-address').text(offer_record.id);
+                managed_list_row.find('.offer-title').text(offer_record.definition.caption);
+                etherToUSD(offer_record.contribution, function(usd) {
+                    if( usd == null ) {
+                        managed_list_row.find('.offer-contribution').text('N/A');
+                        managed_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    managed_list_row.find('.offer-contribution').text(usd + ' USD');
+                    managed_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                });
+                etherToUSD(offer_record.amount, function(usd) {
+                    if( usd == null ) {
+                        managed_list_row.find('.offer-balance').text('N/A');
+                        managed_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    managed_list_row.find('.offer-balance').text(usd + ' USD');
+                    managed_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                });
                 if(offer_record.state != 0n) {
                     managed_list_row.find('.offer-edit-button').addClass('disabled');
                     managed_list_row.find('.offer-approve-button').addClass('disabled');
@@ -425,20 +648,37 @@ $(async function() {
                 if(offer_record.cancelation) {
                     managed_list_row.find('.offer-add-contribution-button').addClass('disabled');
                 }
-                var managed_list_row_icon_box = managed_list_row.find('.managed-list-row-icon-box');
+                var managed_list_row_icon_box = managed_list_row.find('.offer-icon-box');
                 managed_list_row_icon_box.append($($('#icon-state-' + offer_record.state_name).text()));
-                managed_list_tbody.append(managed_list_row);
-
+                managed_list_row_icon_box.parent().append($($('#badge-state-' + offer_record.state_name).text()));
+                managed_list_container.append(translateTree(managed_list_row));
             }
             if(offer_record.is_contributor) {
                 contributions += 1;
                 offer_list_row_icon_box.append($($('#icon-contributor').text()));
 
                 var contribution_list_row = $($('#contribution-list-row').text());
-                contribution_list_row.find('.contribution-list-row-address').text(offer_record.id);
-                contribution_list_row.find('.contribution-list-row-name').text(offer_record.definition.caption);
-                contribution_list_row.find('.contribution-list-row-contribution').text('≊' + etherFormatApprox(offer_record.contribution));
-                contribution_list_row.find('.contribution-list-row-contribution').attr('title',ethers.formatEther(offer_record.contribution) + ethers.EtherSymbol);
+                contribution_list_row.find('.offer-address').text(offer_record.id);
+                contribution_list_row.find('.offer-title').text(offer_record.definition.caption);
+                etherToUSD(offer_record.contribution, function(usd) {
+                    if( usd == null ) {
+                        contribution_list_row.find('.offer-contribution').text('N/A');
+                        contribution_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    contribution_list_row.find('.offer-contribution').text(usd + ' USD');
+                    contribution_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                });
+                etherToUSD(offer_record.amount, function(usd) {
+                    if( usd == null ) {
+                        contribution_list_row.find('.offer-balance').text('N/A');
+                        contribution_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    contribution_list_row.find('.offer-balance').text(usd + ' USD');
+                    contribution_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                });
+
                 if(offer_record.state > 1n) {
                     contribution_list_row.find('.offer-add-contribution-button').addClass('disabled');
                 }
@@ -446,12 +686,12 @@ $(async function() {
                     contribution_list_row.find('.contributor-vote-button').addClass('disabled');
                 }
                 if(offer_record.state == 2n) {
-                    contribution_list_row.find('.contribution-cancel-button').addClass('disabled');
+                    contribution_list_row.find('.cancel-contribution-button').addClass('disabled');
                 }
                 if(offer_record.cancelation) {
                     contribution_list_row.find('.offer-add-contribution-button').addClass('disabled');
                     contribution_list_row.find('.contributor-vote-button').addClass('disabled');
-                    var i$ = contribution_list_row.find('.contribution-cancel-icon');
+                    var i$ = contribution_list_row.find('.cancel-contribution-icon');
                     i$.removeClass('fa-regular fa-circle-xmark');
                     i$.addClass('fa-regular fa-clock');
                     if(offer_record.cancelation_timer) {
@@ -472,17 +712,36 @@ $(async function() {
                         contribution_list_row.find('.contributor-vote-button i').addClass(cl);
                     }
                 }
-                var contribution_list_row_icon_box = contribution_list_row.find('.contribution-list-row-icon-box');
+                var contribution_list_row_icon_box = contribution_list_row.find('.icon-box');
                 contribution_list_row_icon_box.append($($('#icon-state-' + offer_record.state_name).text()));
-                contribution_list_tbody.append(contribution_list_row);
+                contribution_list_row_icon_box.parent().append($($('#badge-state-' + offer_record.state_name).text()));
+                contribution_list_container.append(translateTree(contribution_list_row));
             }
             if(offer_record.is_observer) {
                 observed += 1;
                 offer_list_row_icon_box.append($($('#icon-observer').text()));
 
                 var observing_list_row = $($('#observing-list-row').text());
-                observing_list_row.find('.observing-list-row-address').text(offer_record.id);
-                observing_list_row.find('.observing-list-row-name').text(offer_record.definition.caption);
+                observing_list_row.find('.offer-address').text(offer_record.id);
+                observing_list_row.find('.offer-title').text(offer_record.definition.caption);
+                etherToUSD(offer_record.contribution, function(usd) {
+                    if( usd == null ) {
+                        observing_list_row.find('.offer-contribution').text('N/A');
+                        observing_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    observing_list_row.find('.offer-contribution').text(usd + ' USD');
+                    observing_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                });
+                etherToUSD(offer_record.amount, function(usd) {
+                    if( usd == null ) {
+                        observing_list_row.find('.offer-balance').text('N/A');
+                        observing_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                        return;
+                    }
+                    observing_list_row.find('.offer-balance').text(usd + ' USD');
+                    observing_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                });
                 if(offer_record.state != 1n) {
                     observing_list_row.find('.observer-vote-button').addClass('disabled');
                 }
@@ -498,13 +757,33 @@ $(async function() {
                         observing_list_row.find('.observer-vote-button i').addClass(cl);
                     }
                 }
-                var observing_list_row_icon_box = observing_list_row.find('.observing-list-row-icon-box');
+                var observing_list_row_icon_box = observing_list_row.find('.offer-icon-box');
                 observing_list_row_icon_box.append($($('#icon-state-' + offer_record.state_name).text()));
-                observing_list_tbody.append(observing_list_row);
+                observing_list_row_icon_box.parent().append($($('#badge-state-' + offer_record.state_name).text()));
+                observing_list_container.append(translateTree(observing_list_row));
             }
             offer_list_row_icon_box.append('&nbsp;');
             offer_list_row_icon_box.append($($('#icon-state-' + offer_record.state_name).text()));
-            offer_list_tbody.append(offer_list_row);
+            offer_list_row_icon_box.parent().append($($('#badge-state-' + offer_record.state_name).text()));
+            etherToUSD(offer_record.contribution, function(usd) {
+                if( usd == null ) {
+                    offer_list_row.find('.offer-contribution').text('N/A');
+                    offer_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+                    return;
+                }
+                offer_list_row.find('.offer-contribution').text(usd + ' USD');
+                offer_list_row.find('.offer-contribution').attr('title', ethers.formatEther(offer_record.contribution) + ' ' + ethers.EtherSymbol);
+            });
+            etherToUSD(offer_record.amount, function(usd) {
+                if( usd == null ) {
+                    offer_list_row.find('.offer-balance').text('N/A');
+                    offer_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+                    return;
+                }
+                offer_list_row.find('.offer-balance').text(usd + ' USD');
+                offer_list_row.find('.offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+            }); 
+            offer_list_container.append(translateTree(offer_list_row));
         });
         $('#all-contributions-number').text(contributions);
         $('#all-observed-number').text(observed);
@@ -592,22 +871,19 @@ $(async function() {
     const onhashchange = async function() {
         var params = new URLSearchParams(document.location.hash.substring(1));
         var selector = `#${params.get('pane')}`;
-        if( $(selector).length > 0 ) {
-            bs_selectPane(selector);
-        }
+        if( $(selector).length == 0 )
+            return;
         if(selector == '#edit-offer') {
-            var address = params.get('address');
-            if( address ) {
-                await on_edit_offer(address);
-            }
+            bs_selectPane(selector);
         } else if(selector.startsWith('#view-offer')) {
-            var address = params.get('address');
-            // TODO: implement view offer
+            bs_selectPane(selector);
         } else {
             if( params.get('address') ) {
-                params.delete('address');
+                params.delete('address');  // TODO: cleanup the history
                 var new_hash = '#' + params.toString().replaceAll('+', ' ');
                 document.location.hash = new_hash;
+            } else {
+                bs_selectPane(selector);
             }
         }
     };
@@ -621,26 +897,42 @@ $(async function() {
         } else {
             var current_account = accounts[0];
             var balance = await provider.getBalance(current_account.address);
-            $('.nav-current-account').text(current_account.address);
-            $('.nav-current-amount').text(ethers.formatEther(balance) + ethers.EtherSymbol);
-
+            var addr = current_account.address;
+            $('.nav-current-account').text(shortenedAddress(addr));
+            $('.nav-current-account').attr('title', addr);
+            etherToUSD(balance, function(usd) {
+                if( usd == null ) {
+                    $('.nav-current-amount').text('N/A');
+                    $('.nav-current-amount').attr('title', ethers.formatEther(balance) + ' ' + ethers.EtherSymbol);
+                    return;
+                }
+                $('.nav-current-amount').text('≊' + usd + ' USD');
+                $('.nav-current-amount').attr('title', ethers.formatEther(balance) + ' ' + ethers.EtherSymbol);
+            });
             await onhashchange();
             await fill_offer_lists();
         }
     };
 
     // Copy the entire create-offer tab content to have a similar edit-offer tab
-    $('#edit-offer').html($('#create-offer').html());
+    $('#edit-offer').html(translateHTML($('#create-offer').html()));
     // Modify a display options for edit-offer tab
     $('#edit-offer .input-observers-list').parentsUntil('.col').parent().removeClass('d-none');
 
     // Copy the entire create-offer-submit dialog content to have a similar edit-offer-submit dialog
     $('#edit-offer-submit').html($('#create-offer-submit').html());
+    $('#edit-offer-submit .modal-header h1').text('Update Offer');
     $('#edit-offer-submit .offer-submit-header').html(
         'Account <em class="current-account-id account-address"></em> [<em class="current-account-balance"></em>]' +
         'is going to update the Offer contract <em class="offer-address"></em>'
     );
     $('#edit-offer-submit button[type="submit"]').text('Update Offer');
+    $('#edit-offer-submit .modal-header h1').attr('data-t', 'edit-offer-submit-modal-head-text');
+    $('#edit-offer-submit .offer-submit-header').attr('data-t', 'edit-offer-submit-header-html');
+    $('#edit-offer-submit button[type="submit"]').attr('data-t', 'edit-offer-submit-button-text');
+
+    translateTree($('#edit-offer-submit'));
+
     $('form.needs-validation').on('submit', event => {
         // initiale validation on submit for all forms
         if (!event.target.checkValidity()) {
@@ -656,7 +948,8 @@ $(async function() {
         input_amount_unit$.empty();
         for(var i in etherUnits) {
             var unit = etherUnits[i];
-            var option = `<option title="${unit}" value=${i}>${unit}</option>`;
+            var unitName = etherUnitNames.get(unit) || unit;
+            var option = `<option value="${i}" title="${unitName}">${unit}</option>`;
             var option$ = input_amount_unit$.append(option);
             for(var j=0; j < option$.length; j++) {
                 option$[j].index = i;
@@ -667,7 +960,7 @@ $(async function() {
             if(hidden$.val())
                 $(input_amount_unit$[i]).val(hidden$.val());
             else
-                $(input_amount_unit$[i]).val(3);
+                $(input_amount_unit$[i]).val(6);  // default unit is ETH
         }
 
         input_amount_unit$.on('change', function(event) {
@@ -722,16 +1015,30 @@ $(async function() {
             $(event.currentTarget)[0].old_value = $(event.currentTarget).val();
         });
     }
+
+    var renderMarkdownTo = function(target$, source) {
+        var md = new remarkable.Remarkable('full', {
+            html: true,
+            breaks: true,
+            typographer: true,
+        });
+        target$.html(md.render(source || ''));
+        renderMathInElement(target$[0], {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false
+        });
+    };
+
     {
         // initiate markdown preview for markdown input
         const _update_md = function(src$) {
             var markdown$ = src$.parentsUntil(':has(".markdown")').parent().find('.markdown');
-            var md = new remarkable.Remarkable('full', {
-                html: true,
-                breaks: true,
-                typographer:  true,
-            });
-            markdown$.html(md.render(src$.val()));
+            renderMarkdownTo(markdown$, src$.val());
         };
         $(document).on('input', '.markdown-source', function(event) {
             _update_md($(event.target));
@@ -744,7 +1051,7 @@ $(async function() {
         event.preventDefault();
         // All offer share buttons
         var share_dialog = $('#share-offer');
-        var offer_address = $(event.currentTarget).parents('tr').find('.offer-address').text();
+        var offer_address = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-address').text();
         share_dialog.find('.share-offer-qr').html('').qrcode(offer_address);
         share_dialog.find('.share-offer-address').html('').text(offer_address);
 
@@ -752,10 +1059,26 @@ $(async function() {
     });
     $(document).on('click', '.offer-remove-button', async function(event) {
         event.preventDefault();
-        var offer_address = $(event.currentTarget).parents('tr').find('.offer-address').text();
-        await delete_offer_from_list(offer_address);
-        await fill_offer_lists();
+        var remove_dialog = $('#remove-offer');
+        var offer_address = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-address').text();
+        var offer_title = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-title').text();
+        remove_dialog.find('.offer-title').html('').text(offer_title);
+        remove_dialog.find('.offer-address').html('').text(offer_address);
+
+        bootstrap.Modal.getOrCreateInstance(remove_dialog[0]).show();
     });
+
+    $(document).on('click', '.cancel-contribution-button', async function(event) {
+        event.preventDefault();
+        var cancel_dialog = $('#cancel-contribution');
+        var offer_address = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-address').text();
+        var offer_title = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-title').text();
+        cancel_dialog.find('.offer-title').html('').text(offer_title);
+        cancel_dialog.find('.offer-address').html('').text(offer_address);
+
+        bootstrap.Modal.getOrCreateInstance(cancel_dialog[0]).show();
+    });
+
     $(document).on('click', 'a:has(".offer-address")', async function(event) {
         event.preventDefault();
         var offer_address = $(event.currentTarget).find('.offer-address').text();
@@ -774,7 +1097,7 @@ $(async function() {
         } catch(ex) {
             console.log('Account connection failed:', ex);
             $('#connect-account-button').prop('disabled', false);
-            $('#no-accounts .dialog-error').text('Account connection failed:' + ex.message);
+            $('#no-accounts .dialog-error').text(ex.message);
             return;
         }
         bootstrap.Modal.getOrCreateInstance($('#no-accounts')[0]).hide();
@@ -784,7 +1107,7 @@ $(async function() {
 
     $(document).on('click', '.offer-edit-button', async function(event) {
         event.preventDefault();
-        var offer_address = $(event.currentTarget).parents('tr').find('.offer-address').text();
+        var offer_address = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-address').text();
         var hash = document.location.hash;
         var params = new URLSearchParams(hash.substring(1));
         params.set('pane', 'edit-offer');
@@ -796,8 +1119,8 @@ $(async function() {
         event.preventDefault();
         // Offer approval buttons
         var dialogue$ = $('#approve-offer');
-        var offer_address = $(event.currentTarget).parents('tr').find('.offer-address').text();
-        var offer_title = $(event.currentTarget).parents('tr').find('.managed-list-row-name').text();
+        var offer_address = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-address').text();
+        var offer_title = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-title').text();
         dialogue$.find('.offer-address').text(offer_address);
         dialogue$.find('.offer-title').text(offer_title);
         dialogue$.find('.approve-offer-warning').addClass('d-none');
@@ -809,6 +1132,28 @@ $(async function() {
         modal_info$.addClass('text-info');
         modal_info$.text('');
         bootstrap.Modal.getOrCreateInstance(dialogue$[0]).show();
+    });
+
+    $(document).on('input', 'input.balance-convert', async function(event) {
+        var input$ = $(event.currentTarget);
+        var value = input$.val();
+        var unit = input$.parent().find('select').val();
+        var result$ = input$.parentsUntil(':has(.balance-convert-result)').parent().find('.balance-convert-result');
+        if( value && !isNaN(value) ) {
+            var wei = convertToWei(value, unit);
+            etherToUSD(wei, function(usd) {
+                if( usd == null ) {
+                    result$.text('≊' + 'N/A');
+                    result$.attr('title', ethers.formatEther(wei) + ' ' + ethers.EtherSymbol);
+                    return;
+                }
+                result$.text('≊' + usd + ' USD');
+                result$.attr('title', ethers.formatEther(wei) + ' ' + ethers.EtherSymbol);
+            });
+        } else {
+            result$.text('');
+            result$.attr('title', '');
+        }
     });
 
     {
@@ -920,10 +1265,67 @@ $(async function() {
         });
     }
 
+    {
+        // Remove offer dialogue control
+        $('#remove-offer form').on('submit', async function(event) {
+            event.preventDefault();
+            var dialogue$ = $('#remove-offer');
+
+            var offer_address = dialogue$.find('.offer-address').text();
+            dialogue$.find('.offer-title').html('');
+            dialogue$.find('.offer-address').html('');
+
+            await delete_offer_from_list(offer_address);
+            await fill_offer_lists();
+            bootstrap.Modal.getOrCreateInstance(dialogue$[0]).hide();
+        });
+    }
+
+    {
+        // Cancel contribution dialogue control
+        $('#cancel-contribution form').on('submit', async function(event) {
+            event.preventDefault();
+            var dialogue$ = $('#cancel-contribution');
+            var address = dialogue$.find('.offer-address').text();
+            var current_account = await get_current_account_async();
+            var modal_info$ = dialogue$.find('.modal-footer .modal-info');
+            modal_info$.removeClass('text-danger');
+            modal_info$.removeClass('text-warning');
+            modal_info$.addClass('text-info');
+            modal_info$.text('Waiting for canceling...');
+            dialogue$.find('button').prop('disabled', true);
+            try {
+                var contract = new ethers.Contract(address, offer_abi.abi, current_account);
+                var tx = await contract.contribution_cancel();
+                modal_info$.text('Waiting for transaction...');
+                await tx.wait();
+                modal_info$.text('');
+                dialogue$.find('.offer-title').html('');
+                dialogue$.find('.offer-address').html('');
+                await update_accounts();
+                bootstrap.Modal.getOrCreateInstance(dialogue$[0]).hide();
+            } catch(ex) {
+                var err = ex.shortMessage;
+                console.error('Error cancelling contribution:', ex);
+                if(ex.code == 'ACTION_REJECTED') {
+                    err = 'Cancellation rejected';
+                }
+                if(ex.code == 'CALL_EXCEPTION') {
+                    err = 'Operation rejected: ' + extract_revert_error(ex);
+                }
+                modal_info$.removeClass('text-info');
+                modal_info$.addClass('text-danger');
+                modal_info$.removeClass('text-warning');
+                modal_info$.text('Error: ' + err);
+            }
+            dialogue$.find('button').prop('disabled', false);
+        });
+    }
+
     $(document).on('click', '.offer-add-contribution-button', function(event) {
         // `Plus` sign on the contributions list line
         event.preventDefault();
-        var offer_address = $(event.currentTarget).parentsUntil('tr').parent().find('.offer-address').text();
+        var offer_address = $(event.currentTarget).parentsUntil('.offer-item').parent().find('.offer-address').text();
         var dialogue$ = $('#create-contribution');
         dialogue$.find('.input-address').val(offer_address);
         bootstrap.Modal.getOrCreateInstance(dialogue$[0]).show();
@@ -951,7 +1353,7 @@ $(async function() {
             event.preventDefault();
             bs_selectPane('#managed-offers-list');
         });
-        $('#manage-card-create-offer-button').on('click', async function(event) {
+        $('.create-offer-button').on('click', async function(event) {
             event.preventDefault();
             bs_selectPane('#create-offer');
         });
@@ -1115,6 +1517,15 @@ $(async function() {
                 BigInt(form$.find('.input-voting-fail-timeout').val() * 10) *
                 BigInt(form$.find('.input-voting-fail-timeout ~ select').val()) / 10n
             ),
+            observers_vote_quorum: (
+                BigInt(form$.find('.input-observers-vote-quorum').val() * 100)
+            ),
+            contributors_vote_quorum: (
+                BigInt(form$.find('.input-contributors-vote-quorum').val() * 100)
+            ),
+            contributors_vote_fund_quorum: (
+                BigInt(form$.find('.input-contributors-vote-fund-quorum').val() * 100)
+            ),
             observers_vote_percent: (
                 BigInt(form$.find('.input-observers-vote-percent').val() * 100)
             ),
@@ -1134,7 +1545,6 @@ $(async function() {
         dialogue$.find('form')[0].current_account = current_account;
         var balance = await provider.getBalance(current_account.address);
         var dialogue = bootstrap.Modal.getOrCreateInstance(dialogue$[0]).show();
-        dialogue$.find('.modal-header h1').text('Create a new Offer');
         dialogue$.find('.current-account-id').text(current_account.address);
         dialogue$.find('.current-account-balance').text(etherFormatApprox(balance));
 
@@ -1145,16 +1555,14 @@ $(async function() {
         dialogue$.find('.input-voting-start-count').text(definition.voting_start_count);
         dialogue$.find('.input-voting-start-timeout').text(durationHuman(definition.voting_start_timeout));
         dialogue$.find('.input-voting-fail-timeout').text(durationHuman(definition.voting_fail_timeout));
+        dialogue$.find('.input-observers-vote-quorum').text(Number(definition.observers_vote_quorum) / 100 + '%');
+        dialogue$.find('.input-contributors-vote-quorum').text(Number(definition.contributors_vote_quorum) / 100 + '%');
+        dialogue$.find('.input-contributors-vote-fund-quorum').text(Number(definition.contributors_vote_fund_quorum) / 100 + '%');
         dialogue$.find('.input-observers-vote-percent').text(Number(definition.observers_vote_percent) / 100 + '%');
         dialogue$.find('.input-contributors-vote-percent').text(Number(definition.contributors_vote_percent) / 100 + '%');
         dialogue$.find('.input-contributors-vote-fund-percent').text(Number(definition.contributors_vote_fund_percent) / 100 + '%');
-        var md = new remarkable.Remarkable('full', {
-            html: true,
-            breaks: true,
-            typographer: true,
-        });
-        dialogue$.find('.input-description').html(md.render(definition.description));
-        dialogue$.find('.input-full-details').html(md.render(definition.full_details));
+        renderMarkdownTo(dialogue$.find('.input-description'), definition.description);
+        renderMarkdownTo(dialogue$.find('.input-full-details'), definition.full_details);
         var modal_info$ = dialogue$.find('.modal-footer .modal-info');
         modal_info$.removeClass('text-danger');
         modal_info$.removeClass('text-warning');
@@ -1229,30 +1637,70 @@ $(async function() {
         var p = event.currentTarget.parentElement;
         var p_p = p.parentElement;
         var input$ = $(p_p).find('.ether-address-input');
+        var cancel$ = $(p_p).find('.vote-cancel');
         var camera$ = $(p_p).find('.ether-address-input-button');
         if( disabled ) {
             input$.addClass('d-none');
             input$.prop('required', false);
             input$.val('');
             camera$.addClass('d-none');
+            cancel$.addClass('d-none');
             p_p.appendChild(input$[0]);
             p_p.appendChild(camera$[0]);
+            p_p.appendChild(cancel$[0]);
+            $(event.currentTarget).find('.button-text').removeClass('d-none');
+            event.currentTarget.style.width = '100%';
+        } else {
+            p.appendChild(input$[0]);
+            p.appendChild(cancel$[0]);
+            p.appendChild(event.currentTarget);
+            p.appendChild(camera$[0]);
+            event.currentTarget.style.width = '';
+            $(event.currentTarget).find('.button-text').addClass('d-none');
+            input$.prop('required', true);
+            input$.removeClass('d-none');
+            cancel$.removeClass('d-none');
+            camera$.removeClass('d-none');
+        }
+    });
+    $('#contributor-vote .vote-cancel').on('click', function(event) {
+        var p = event.currentTarget.parentElement;
+        var p_p = p.parentElement;
+        var disabled = event.currentTarget.ariaPressed == 'true';
+        var input$ = $(p_p).find('.ether-address-input');
+        var failure$ = $(p_p).find('.failure');
+        var camera$ = $(p_p).find('.ether-address-input-button');
+        if( disabled ) {
+            input$.addClass('d-none');
+            input$.prop('required', false);
+            input$.val('');
+            camera$.addClass('d-none');
+            failure$.addClass('d-none');
+            p_p.appendChild(input$[0]);
+            p_p.appendChild(camera$[0]);
+            p_p.appendChild(failure$[0]);
+            $(event.currentTarget).find('.button-text').removeClass('d-none');
             event.currentTarget.style.width = '100%';
         } else {
             p.appendChild(input$[0]);
             p.appendChild(event.currentTarget);
+            p.appendChild(failure$[0]);
             p.appendChild(camera$[0]);
             event.currentTarget.style.width = '';
+            $(event.currentTarget).find('.button-text').addClass('d-none');
             input$.prop('required', true);
             input$.removeClass('d-none');
+            failure$.removeClass('d-none');
             camera$.removeClass('d-none');
         }
     });
+
     $('#contributor-vote form').on('submit', async function(event) {
         event.preventDefault();
         var dialogue$ = $('#contributor-vote');
         var form$ = dialogue$.find('form');
         var failure = dialogue$.find('.failure')[0].ariaPressed == 'true';
+        var cancel = dialogue$.find('.vote-cancel')[0].ariaPressed == 'true';
         var contender = dialogue$.find('.ether-address-input').val();
         var offer_address = dialogue$.find('.offer-address').text();
         var current_account = await get_current_account_async();
@@ -1272,6 +1720,8 @@ $(async function() {
             var tx;
             if( failure ) {
                 tx = await offer_access.contributor_vote_failure();
+            } else if( cancel ) {
+                tx = await offer_access.contributor_vote_cancel();
             } else {
                 tx = await offer_access.contributor_vote(contender);
             }
@@ -1282,7 +1732,11 @@ $(async function() {
             console.error('Error voting:', ex);
             var err = ex.shortMessage || ex.message;
             if(ex.code == 'ACTION_REJECTED') {
-                err = 'Voting rejected';
+                if( cancel ) {
+                    err = 'Cancellation rejected';
+                } else {
+                    err = 'Voting rejected';
+                }
             }
             if(ex.code == 'CALL_EXCEPTION') {
                 err = 'Operation rejected: ' + extract_revert_error(ex);
@@ -1297,9 +1751,19 @@ $(async function() {
     });
     $(document).on('click', '.contributor-vote-button', function(event) {
         event.preventDefault();
-        var offer_title = $(event.currentTarget).parents('tr').find('.offer-title').text();
-        var offer_address = $(event.currentTarget).parents('tr').find('.offer-address').text();
+        var offer_title = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-title').text();
+        var offer_address = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-address').text();
         var dialogue$ = $('#contributor-vote');
+        dialogue$.find('.offer-title').text(offer_title);
+        dialogue$.find('.offer-address').text(offer_address);
+        var dialogue = bootstrap.Modal.getOrCreateInstance(dialogue$[0]).show();
+    });
+
+    $(document).on('click', '.cancel-contribution-button', function(event) {
+        event.preventDefault();
+        var offer_title = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-title').text();
+        var offer_address = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-address').text();
+        var dialogue$ = $('#cancel-contribution');
         dialogue$.find('.offer-title').text(offer_title);
         dialogue$.find('.offer-address').text(offer_address);
         var dialogue = bootstrap.Modal.getOrCreateInstance(dialogue$[0]).show();
@@ -1310,23 +1774,61 @@ $(async function() {
         var p = event.currentTarget.parentElement;
         var p_p = p.parentElement;
         var input$ = $(p_p).find('.ether-address-input');
+        var cancel$ = $(p_p).find('.vote-cancel');
+        var camera$ = $(p_p).find('.ether-address-input-button');
+        if( disabled ) {
+            input$.addClass('d-none');
+            input$.prop('required', false);
+            input$.val('');
+            cancel$.addClass('d-none');
+            camera$.addClass('d-none');
+            p_p.appendChild(input$[0]);
+            p_p.appendChild(cancel$[0]);
+            p_p.appendChild(camera$[0]);
+            $(event.currentTarget).find('.button-text').removeClass('d-none');
+            event.currentTarget.style.width = '100%';
+        } else {
+            p.appendChild(input$[0]);
+            p.appendChild(cancel$[0]);
+            p.appendChild(event.currentTarget);
+            p.appendChild(camera$[0]);
+            event.currentTarget.style.width = '';
+            input$.prop('required', true);
+            input$.removeClass('d-none');
+            cancel$.removeClass('d-none');
+            camera$.removeClass('d-none');
+            $(event.currentTarget).find('.button-text').addClass('d-none');
+        }
+    });
+    $('#observer-vote .vote-cancel').on('click', function(event) {
+        var p = event.currentTarget.parentElement;
+        var p_p = p.parentElement;
+        var disabled = event.currentTarget.ariaPressed == 'true';
+        var input$ = $(p_p).find('.ether-address-input');
+        var failure$ = $(p_p).find('.failure');
         var camera$ = $(p_p).find('.ether-address-input-button');
         if( disabled ) {
             input$.addClass('d-none');
             input$.prop('required', false);
             input$.val('');
             camera$.addClass('d-none');
+            failure$.addClass('d-none');
             p_p.appendChild(input$[0]);
             p_p.appendChild(camera$[0]);
+            p_p.appendChild(failure$[0]);
             event.currentTarget.style.width = '100%';
+            $(event.currentTarget).find('.button-text').removeClass('d-none');
         } else {
             p.appendChild(input$[0]);
             p.appendChild(event.currentTarget);
+            p.appendChild(failure$[0]);
             p.appendChild(camera$[0]);
             event.currentTarget.style.width = '';
             input$.prop('required', true);
             input$.removeClass('d-none');
+            failure$.removeClass('d-none');
             camera$.removeClass('d-none');
+            $(event.currentTarget).find('.button-text').addClass('d-none');
         }
     });
     $('#observer-vote form').on('submit', async function(event) {
@@ -1334,6 +1836,7 @@ $(async function() {
         var dialogue$ = $('#observer-vote');
         var form$ = dialogue$.find('form');
         var failure = dialogue$.find('.failure')[0].ariaPressed == 'true';
+        var cancel = dialogue$.find('.vote-cancel')[0].ariaPressed == 'true';
         var contender = dialogue$.find('.ether-address-input').val();
         var offer_address = dialogue$.find('.offer-address').text();
         var current_account = await get_current_account_async();
@@ -1353,6 +1856,8 @@ $(async function() {
             var tx;
             if( failure ) {
                 tx = await offer_access.observer_vote_failure();
+            } else if( cancel ) {
+                tx = await offer_access.observer_vote_cancel();
             } else {
                 tx = await offer_access.observer_vote(contender);
             }
@@ -1363,7 +1868,11 @@ $(async function() {
             console.error('Error voting:', ex);
             var err = ex.shortMessage || ex.message;
             if(ex.code == 'ACTION_REJECTED') {
-                err = 'Voting rejected';
+                if( cancel ) {
+                    err = 'Cancellation rejected';
+                } else { 
+                    err = 'Voting rejected';
+                }
             }
             if(ex.code == 'CALL_EXCEPTION') {
                 err = 'Operation rejected: ' + extract_revert_error(ex);
@@ -1379,8 +1888,8 @@ $(async function() {
     });
     $(document).on('click', '.observer-vote-button', function(event) {
         event.preventDefault();
-        var offer_title = $(event.currentTarget).parents('tr').find('.offer-title').text();
-        var offer_address = $(event.currentTarget).parents('tr').find('.offer-address').text();
+        var offer_title = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-title').text();
+        var offer_address = $(event.currentTarget).parentsUntil('.offer-item').find('.offer-address').text();
         var dialogue$ = $('#observer-vote');
         dialogue$.find('.offer-title').text(offer_title);
         dialogue$.find('.offer-address').text(offer_address);
@@ -1452,6 +1961,10 @@ $(async function() {
             edit_offer$.find('input.input-voting-fail-timeout').val(v[0]);
             edit_offer$.find('input.input-voting-fail-timeout ~ .input-timeout-unit').val(v[1]);
 
+            edit_offer$.find('input.input-observers-vote-quorum').val(Number(offer_record.definition.observers_vote_quorum) / 100.);
+            edit_offer$.find('input.input-contributors-vote-quorum').val(Number(offer_record.definition.contributors_vote_quorum) / 100.);
+            edit_offer$.find('input.input-contributors-vote-fund-quorum').val(Number(offer_record.definition.contributors_vote_fund_quorum) / 100.);
+
             edit_offer$.find('input.input-observers-vote-percent').val(Number(offer_record.definition.observers_vote_percent) / 100.);
             edit_offer$.find('input.input-contributors-vote-percent').val(Number(offer_record.definition.contributors_vote_percent) / 100.);
             edit_offer$.find('input.input-contributors-vote-fund-percent').val(Number(offer_record.definition.contributors_vote_fund_percent) / 100.);
@@ -1467,8 +1980,11 @@ $(async function() {
 
         }
 
+        edit_offer$.find('form button[type="submit"]').attr('data-t', 'edit-offer-tab-pane-submit');
         if( offer_record.is_owner && offer_record.state < 1n ) {
-            edit_offer$.find('.tab-pane-header').html(`Edit Offer <em class="offer-address>">${address}</em>`);
+            var header=$($('#edit-offer-tab-pane-header').text());
+            header.find('.offer-address').text(address);
+            edit_offer$.find('.tab-pane-header').html(header.html());
             edit_offer$.find('form button[type="submit"]').text('Update Offer');
             edit_offer$.find('form .form-control').prop('readonly', false);
             edit_offer$.find('form .form-select').prop('readonly', false);
@@ -1476,7 +1992,9 @@ $(async function() {
             edit_offer$.find('form button[type="submit"]').removeClass('invisible');
             edit_offer$.find('.edit-only').removeClass('d-none');
         } else {
-            edit_offer$.find('.tab-pane-header').html(`View Offer <em class="offer-address>">${address}</em>`);
+            var header=$($('#view-offer-tab-pane-header').text());
+            header.find('.offer-address').text(address);
+            edit_offer$.find('.tab-pane-header').html(header.html());
             edit_offer$.find('form button[type="submit"]').text('');
             edit_offer$.find('form .form-control').prop('readonly', true);
             edit_offer$.find('form .form-select').prop('readonly', true);
@@ -1484,6 +2002,7 @@ $(async function() {
             edit_offer$.find('form button[type="submit"]').addClass('invisible');
             edit_offer$.find('.edit-only').addClass('d-none');
         }
+        translateTree(edit_offer$[0]);
     };
 
     $('#edit-offer .input-observers-list .list-add').on('click', async function(event) {
@@ -1600,6 +2119,7 @@ $(async function() {
                 offer_record.definition,
                 offer_record.amount,
                 offer_record.approved_at,
+                offer_record.voting_started_at,
                 offer_record.completed_at,
                 offer_record.failed_at,
                 offer_record.voting_statistics,
@@ -1611,6 +2131,7 @@ $(async function() {
                 offer_access.definition(),
                 provider.getBalance(offer_record.id),
                 offer_access.approved_at(),
+                offer_access.voting_started_at(),
                 offer_access.completed_at(),
                 offer_access.failed_at(),
                 offer_access.voting_statistics(),
@@ -1660,49 +2181,63 @@ $(async function() {
             $('#view-offer .offer-balance-head').removeClass('d-none');
             $('#view-offer .offer-balance-table').removeClass('d-none');
         }
-        var md = new remarkable.Remarkable('full', {
-            html: true,
-            breaks: true,
-            typographer:  true,
+        renderMarkdownTo($('#view-offer .offer-description'), offer_record.definition.description);
+        renderMarkdownTo($('#view-offer .offer-full-details'), offer_record.definition.full_details);
+        etherToUSD(offer_record.definition.contribution_min_balance, function(usd) {
+            $('#view-offer .offer-contribution-min-balance').text(usd ? '≊$' + usd : '');
+            $('#view-offer .offer-contribution-min-balance').attr('title', ethers.formatEther(offer_record.definition.contribution_min_balance) + ' ' + ethers.EtherSymbol);
         });
-        $('#view-offer .offer-description').html(md.render(offer_record.definition.description));
-        $('#view-offer .offer-full-details').html(md.render(offer_record.definition.full_details));
-        $('#view-offer .offer-contribution-min-balance').text(etherHuman(offer_record.definition.contribution_min_balance));
         $('#view-offer .offer-contribution-unlock-timeout').text(durationHuman(offer_record.definition.contribution_unlock_timeout));
-        $('#view-offer .offer-voting-start-balance').text(etherHuman(offer_record.definition.voting_start_balance));
+        etherToUSD(offer_record.definition.voting_start_balance, function(usd) {
+            $('#view-offer .offer-voting-start-balance').text(usd ? '≊$' + usd : '');
+            $('#view-offer .offer-voting-start-balance').attr('title', ethers.formatEther(offer_record.definition.voting_start_balance) + ' ' + ethers.EtherSymbol);
+        });
         $('#view-offer .offer-voting-start-count').text(offer_record.definition.voting_start_count);
         $('#view-offer .offer-voting-start-timeout').text(durationHuman(offer_record.definition.voting_start_timeout));
         $('#view-offer .offer-voting-fail-timeout').text(durationHuman(offer_record.definition.voting_fail_timeout));
+        $('#view-offer .offer-observers-vote-quorum').text(Number(offer_record.definition.observers_vote_quorum) / 100 + '%');
+        $('#view-offer .offer-contributors-vote-quorum').text(Number(offer_record.definition.contributors_vote_quorum) / 100 + '%');
+        $('#view-offer .offer-contributors-vote-fund-quorum').text(Number(offer_record.definition.contributors_vote_fund_quorum) / 100 + '%');
         $('#view-offer .offer-observers-vote-percent').text(Number(offer_record.definition.observers_vote_percent) / 100 + '%');
         $('#view-offer .offer-contributors-vote-percent').text(Number(offer_record.definition.contributors_vote_percent) / 100 + '%');
         $('#view-offer .offer-contributors-vote-fund-percent').text(Number(offer_record.definition.contributors_vote_fund_percent) / 100 + '%');
-        $('#view-offer .offer-state-icon').html(
+        $('#view-offer .offer-state-icon').html(translateTree(
             $($('#icon-state-' + offer_record.state_name).text())
-        );
-        $('#view-offer .offer-balance').text(etherHuman(offer_record.amount));
+        ));
+        etherToUSD(offer_record.amount, function(usd) {
+            $('#view-offer .offer-balance').text(usd ? '≊$' + usd : '');
+            $('#view-offer .offer-balance').attr('title', ethers.formatEther(offer_record.amount) + ' ' + ethers.EtherSymbol);
+        });
         $('#view-offer .offer-approved-at-row').addClass('d-none');
+        $('#view-offer .offer-voting-started-at-row').addClass('d-none');
         $('#view-offer .offer-completed-at-row').addClass('d-none');
         $('#view-offer .offer-failed-at-row').addClass('d-none');
         if(offer_record.state > 0n) {
             $('#view-offer .offer-approved-at-row').removeClass('d-none');
+        }
+        if(offer_record.voting_started_at > 0n) {
+            $('#view-offer .offer-voting-started-at-row').removeClass('d-none');
         }
         if(offer_record.state == 2n) {
             $('#view-offer .offer-completed-at-row').removeClass('d-none');
         } else if(offer_record.state == 3n) {
             $('#view-offer .offer-failed-at-row').removeClass('d-none');
         }
-        $('#view-offer .offer-approved-at').text(offer_record.approved_at ? new Date(Number(offer_record.approved_at) * 1000).toLocaleString() : '-');
-        $('#view-offer .offer-completed-at').text(offer_record.completed_at ? new Date(Number(offer_record.completed_at) * 1000).toLocaleString() : '-');
-        $('#view-offer .offer-failed-at').text(offer_record.failed_at ? new Date(Number(offer_record.failed_at) * 1000).toLocaleString() : '-');
+        var current_lang = localStorage.getItem('ogoo_lang') || 'en';
+        $('#view-offer .offer-approved-at').text(offer_record.approved_at ? new Date(Number(offer_record.approved_at) * 1000).toLocaleString(current_lang) : '-');
+        $('#view-offer .offer-voting-started-at').text(offer_record.voting_started_at ? new Date(Number(offer_record.voting_started_at) * 1000).toLocaleString(current_lang) : '-');
+        $('#view-offer .offer-completed-at').text(offer_record.completed_at ? new Date(Number(offer_record.completed_at) * 1000).toLocaleString(current_lang) : '-');
+        $('#view-offer .offer-failed-at').text(offer_record.failed_at ? new Date(Number(offer_record.failed_at) * 1000).toLocaleString(current_lang) : '-');
         $('#view-offer .offer-total-observers-count').text(
             offer_record.voting_statistics.total_observers_count
         );
         $('#view-offer .offer-total-contributors-count').text(
             offer_record.voting_statistics.total_contributors_count
         );
-        $('#view-offer .offer-total-contributors-fund').text(
-            etherHuman(offer_record.voting_statistics.total_contributors_fund)
-        );
+        etherToUSD(offer_record.voting_statistics.total_contributors_fund, function(usd) {
+            $('#view-offer .offer-total-contributors-fund').text(usd ? '≊$' + usd : '');
+            $('#view-offer .offer-total-contributors-fund').attr('title', ethers.formatEther(offer_record.voting_statistics.total_contributors_fund) + ' ' + ethers.EtherSymbol);
+        });
         $('#view-offer .offer-observer-contenders-count').text(
             offer_record.voting_statistics.sorted_observers_leaders.length
         );
@@ -1753,6 +2288,23 @@ $(async function() {
         }
     });
 
+    $('#edit-offer').on('visible', async function(event) {
+        if(event.target == $('#edit-offer')[0] ) {
+            var params = new URLSearchParams(document.location.hash.substring(1));
+            var address = params.get('address');
+            if( address.length > 0 )
+                await on_edit_offer(address);
+        }
+    });
+
+    $('#user-guide').on('visible', async function(event) {
+        if(event.target == $('#user-guide')[0]) {
+            var lang = localStorage.getItem('ogoo_lang');
+            var content = await $.ajax(url='./USER-GUIDE.' + lang + '.md');
+            var target$ = $('#user-guide .content');
+            renderMarkdownTo(target$, content);
+        }
+    });
 
     $('#edit-offer form').on('submit', async function(event) {
         // edit offer page submit
@@ -1783,6 +2335,15 @@ $(async function() {
                 BigInt(form$.find('.input-voting-fail-timeout').val() * 10) *
                 BigInt(form$.find('.input-voting-fail-timeout ~ select').val()) / 10n
             ),
+            observers_vote_quorum: (
+                BigInt(form$.find('.input-observers-vote-quorum').val() * 100)
+            ),
+            contributors_vote_quorum: (
+                BigInt(form$.find('.input-contributors-vote-quorum').val() * 100)
+            ),
+            contributors_vote_fund_quorum: (
+                BigInt(form$.find('.input-contributors-vote-fund-quorum').val() * 100)
+            ),
             observers_vote_percent: (
                 BigInt(form$.find('.input-observers-vote-percent').val() * 100)
             ),
@@ -1803,7 +2364,6 @@ $(async function() {
         dialogue$.find('form')[0].address = form$[0].address;
         var balance = await provider.getBalance(current_account.address);
         var dialogue = bootstrap.Modal.getOrCreateInstance(dialogue$[0]).show();
-        dialogue$.find('.modal-header h1').text('Update Offer ');
         dialogue$.find('.current-account-id').text(current_account.address);
         dialogue$.find('.current-account-balance').text(etherFormatApprox(balance));
         dialogue$.find('.offer-address').text(form$[0].address);
@@ -1815,16 +2375,14 @@ $(async function() {
         dialogue$.find('.input-voting-start-count').text(definition.voting_start_count);
         dialogue$.find('.input-voting-start-timeout').text(durationHuman(definition.voting_start_timeout));
         dialogue$.find('.input-voting-fail-timeout').text(durationHuman(definition.voting_fail_timeout));
+        dialogue$.find('.input-observers-vote-quorum').text(Number(definition.observers_vote_quorum) / 100 + '%');
+        dialogue$.find('.input-contributors-vote-quorum').text(Number(definition.contributors_vote_quorum) / 100 + '%');
+        dialogue$.find('.input-contributors-vote-fund-quorum').text(Number(definition.contributors_vote_fund_quorum) / 100 + '%');
         dialogue$.find('.input-observers-vote-percent').text(Number(definition.observers_vote_percent) / 100 + '%');
         dialogue$.find('.input-contributors-vote-percent').text(Number(definition.contributors_vote_percent) / 100 + '%');
         dialogue$.find('.input-contributors-vote-fund-percent').text(Number(definition.contributors_vote_fund_percent) / 100 + '%');
-        var md = new remarkable.Remarkable('full', {
-            html: true,
-            breaks: true,
-            typographer: true,
-        });
-        dialogue$.find('.input-description').html(md.render(definition.description));
-        dialogue$.find('.input-full-details').html(md.render(definition.full_details));
+        renderMarkdownTo(dialogue$.find('.input-description'), definition.description);
+        renderMarkdownTo(dialogue$.find('.input-full-details'), definition.full_details);
         var modal_info$ = dialogue$.find('.modal-footer .modal-info');
         modal_info$.removeClass('text-danger');
         modal_info$.removeClass('text-warning');
@@ -1951,6 +2509,9 @@ $(async function() {
                     logger.warning('Error ignored', ex);
                 }
             }
+            if( dialogue$[0].parent_dialogue$ && dialogue$[0].parent_dialogue$.length ) {
+                bootstrap.Modal.getOrCreateInstance(dialogue$[0].parent_dialogue$[0]).show();
+            }
         });
         $(document).on('click', button_selector, function(event) {
             // find an input
@@ -1968,6 +2529,11 @@ $(async function() {
                 return;
             }
             dialogue$[0].input$ = input$;
+            var parent_dialogue$ = parent$.parents('.modal');
+            if( parent_dialogue$.length ) {
+                bootstrap.Modal.getOrCreateInstance(parent_dialogue$[0]).hide();
+            }
+            dialogue$[0].parent_dialogue$ = parent_dialogue$;
             bootstrap.Modal.getOrCreateInstance(dialogue$[0]).show();
         });
         QrScanner.hasCamera().then((has)=>{
@@ -1987,6 +2553,8 @@ $(async function() {
             $(panes$[ip]).on('visible', async function(event) {
                 var pane$ = $(event.target);
                 if( pane$.is('.tab-pane') ) {
+                    if( pane$.find('.tab-pane').length )
+                        return; // ignore pane with subpanes - they are processed separately
                     var hash = document.location.hash;
                     var params = new URLSearchParams(hash.substring(1));
                     params.set('pane', pane$.attr('id'));
@@ -2038,7 +2606,7 @@ $(async function() {
     }
 
     const on_change_wallet = async function(option$) {
-        var form$ = $('form[role="wallets"]');
+        var form$ = $('[role="wallets"]');
         var button$ = form$.find('[data-bs-toggle="dropdown"]');
         ethereum = option$[0].ethereum;
         provider = new ethers.BrowserProvider(ethereum, 'any');
@@ -2069,7 +2637,7 @@ $(async function() {
                 var balance = await provider.getBalance(account_address);
                 account_balance_s = ethers.formatEther(balance) + ethers.EtherSymbol;
             }
-            var form$ = $('form[role="wallets"]');
+            var form$ = $('[role="wallets"]');
             var option$ = $(`
                 <li rdns="${event.detail.info.rdns}">
                     <a class="dropdown-item" href="#" title="${account_address}">
@@ -2121,13 +2689,13 @@ $(async function() {
         }
     );
     const refill_wallets = async function() {
-        var form$ = $('form[role="wallets"]');
+        var form$ = $('[role="wallets"]');
         form$.find('.dropdown-menu').html('');
         console.debug('Request providers');
         window.dispatchEvent(new Event("eip6963:requestProvider"));
     };
     refill_wallets();
-    $(document).on('click', 'form[role="wallets"] a.dropdown-item', async function(event) {
+    $(document).on('click', '[role="wallets"] a.dropdown-item', async function(event) {
         event.preventDefault();
         var option$ = $(event.currentTarget).parent();
         await on_change_wallet(option$);

@@ -8,29 +8,549 @@
 
 pragma solidity ^0.8.20;
 
-<%- include("solt/std.solt") -%>
-<%- include_with("solt/set.solt", {
-    SET_LIBRARY: "address_set",
-    SET_KEYTYPE: "address"
-}) -%>
+// ----------------------------------------------------------------------------
+// Solidity Templates Std library
+//
+// Copyright (c) 2025 nnseva LGPL 3.0
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Solidity Templates Set library
+//
+// Copyright (c) 2025 nnseva LGPL 3.0
+//
+// Initial version has been based on
+// OpenZeppelin Contracts
+// Copyright (c) 2016-2025 Zeppelin Group Ltd MIT
+// https://github.com/OpenZeppelin/openzeppelin-contracts
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Solidity Templates Std library
+//
+// Copyright (c) 2025 nnseva LGPL 3.0
+// ----------------------------------------------------------------------------
+library address_set {
+    // The Set data structure.
+    // 
+    // The structure is used to store the Set in the storage.
+    // 
+    // Use this structure for the Set type f.e.:
+    //      using uint256_set for uint256_set.Set;
+    struct Set {
+        // Storage of the set keys.
+        // 
+        // You can inspect it any time to access and iterate
+        // the contents of the set in the readonly mode.
+        // 
+        // values.length is an actual set size.
+        //
+        address[] values;
+        // Backreference from the key value to the index.
+        // 
+        // The index of the value in the values array plus 1.
+        // The zero 0 position is used to mean a value is not in the set.
+        //
+        mapping(address => uint256) positions;
+    }
 
-<%- include_with("solt/set.solt", {
-    SET_LIBRARY: "uint_set",
-    SET_KEYTYPE: "uint"
-}) -%>
+    // Add a value to a set. O(1).
+    //
+    // Returns true if the value was added to the set, that is if it was not
+    // already present.
+    //
+    function add(Set storage self, address value) internal returns (bool) {
+        if (!contains(self, value)) {
+            self.values.push(value);
+            // The value is stored at length-1, but we add 1 to all indexes
+            // and use 0 as a sentinel value
+            self.positions[value] = self.values.length;
+            return true;
+        } else {
+            return false;
+        }
+    }
 
-<%- include_with("solt/index_direct.solt", {
-    DIRECT_LIBRARY: "uint_direct",
-    DIRECT_KEYTYPE: "uint"
-}) -%>
+    // Removes a value from a set. O(1).
+    //
+    // Returns true if the value was removed from the set, that is if it was
+    // present.
+    //
+    function remove(Set storage self, address value) internal returns (bool) {
+        // We cache the values position to prevent multiple reads from the same storage slot
+        uint256 position = self.positions[value];
 
-<%
-assert = function(condition) {
-    if( typeof(RELEASE) == 'undefined' ) {
-        return 'assert(' + condition + ');';
+        if (position != 0) {
+            // Equivalent to contains(self, value)
+            // To delete an element from the values array in O(1), we swap the element to delete with the last one in
+            // the array, and then remove the last element (sometimes called as swap and pop).
+            // This modifies the order of the array, as noted in {at}.
+
+            uint256 valueIndex = position - 1;
+            uint256 lastIndex = self.values.length - 1;
+
+            if (valueIndex != lastIndex) {
+                address lastValue = self.values[lastIndex];
+
+                // Move the lastValue to the index where the value to delete is
+                self.values[valueIndex] = lastValue;
+                // Update the tracked position of the lastValue (that was just moved)
+                self.positions[lastValue] = position;
+            }
+
+            // Delete the slot where the moved value was stored
+            self.values.pop();
+
+            // Delete the tracked position for the deleted slot
+            delete self.positions[value];
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // Returns true if the value is in the set. O(1).
+    //
+    function contains(Set storage self, address value) internal view returns (bool) {
+        return self.positions[value] != 0;
+    }
+
+    // Returns length of the set. O(1).
+    //
+    function length(Set storage self) internal view returns(uint256) {
+        return self.values.length;
+    }
+
+    // Returns the value at the position. O(1).
+    //
+    function at(Set storage self, uint256 position) internal view returns(address) {
+        return self.values[position];
     }
 }
--%>
+
+// ----------------------------------------------------------------------------
+// Solidity Templates Set library
+//
+// Copyright (c) 2025 nnseva LGPL 3.0
+//
+// Initial version has been based on
+// OpenZeppelin Contracts
+// Copyright (c) 2016-2025 Zeppelin Group Ltd MIT
+// https://github.com/OpenZeppelin/openzeppelin-contracts
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// Solidity Templates Std library
+//
+// Copyright (c) 2025 nnseva LGPL 3.0
+// ----------------------------------------------------------------------------
+library uint_set {
+    // The Set data structure.
+    // 
+    // The structure is used to store the Set in the storage.
+    // 
+    // Use this structure for the Set type f.e.:
+    //      using uint256_set for uint256_set.Set;
+    struct Set {
+        // Storage of the set keys.
+        // 
+        // You can inspect it any time to access and iterate
+        // the contents of the set in the readonly mode.
+        // 
+        // values.length is an actual set size.
+        //
+        uint[] values;
+        // Backreference from the key value to the index.
+        // 
+        // The index of the value in the values array plus 1.
+        // The zero 0 position is used to mean a value is not in the set.
+        //
+        mapping(uint => uint256) positions;
+    }
+
+    // Add a value to a set. O(1).
+    //
+    // Returns true if the value was added to the set, that is if it was not
+    // already present.
+    //
+    function add(Set storage self, uint value) internal returns (bool) {
+        if (!contains(self, value)) {
+            self.values.push(value);
+            // The value is stored at length-1, but we add 1 to all indexes
+            // and use 0 as a sentinel value
+            self.positions[value] = self.values.length;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // Removes a value from a set. O(1).
+    //
+    // Returns true if the value was removed from the set, that is if it was
+    // present.
+    //
+    function remove(Set storage self, uint value) internal returns (bool) {
+        // We cache the values position to prevent multiple reads from the same storage slot
+        uint256 position = self.positions[value];
+
+        if (position != 0) {
+            // Equivalent to contains(self, value)
+            // To delete an element from the values array in O(1), we swap the element to delete with the last one in
+            // the array, and then remove the last element (sometimes called as swap and pop).
+            // This modifies the order of the array, as noted in {at}.
+
+            uint256 valueIndex = position - 1;
+            uint256 lastIndex = self.values.length - 1;
+
+            if (valueIndex != lastIndex) {
+                uint lastValue = self.values[lastIndex];
+
+                // Move the lastValue to the index where the value to delete is
+                self.values[valueIndex] = lastValue;
+                // Update the tracked position of the lastValue (that was just moved)
+                self.positions[lastValue] = position;
+            }
+
+            // Delete the slot where the moved value was stored
+            self.values.pop();
+
+            // Delete the tracked position for the deleted slot
+            delete self.positions[value];
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // Returns true if the value is in the set. O(1).
+    //
+    function contains(Set storage self, uint value) internal view returns (bool) {
+        return self.positions[value] != 0;
+    }
+
+    // Returns length of the set. O(1).
+    //
+    function length(Set storage self) internal view returns(uint256) {
+        return self.values.length;
+    }
+
+    // Returns the value at the position. O(1).
+    //
+    function at(Set storage self, uint256 position) internal view returns(uint) {
+        return self.values[position];
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Solidity Templates Direct Index library
+//
+// Copyright (c) 2025 nnseva LGPL 3.0
+//
+// Initial version has been based on
+// BokkyPooBah's Red-Black Tree Library
+// Copyright (c) BokkyPooBah / Bok Consulting Pty Ltd 2020. The MIT Licence.
+// https://github.com/bokkypoobah/BokkyPooBahsRedBlackTreeLibrary
+// ----------------------------------------------------------------------------
+library uint_direct {
+    struct Node {
+        uint parent;
+        uint left;
+        uint right;
+        bool red;
+    }
+
+    struct Index {
+        uint root;
+        mapping(uint => Node) nodes;
+    }
+
+    uint private constant EMPTY = 0;
+
+    function first(Index storage self) internal view returns (uint _key) {
+        _key = self.root;
+        if (_key != EMPTY) {
+            while (self.nodes[_key].left != EMPTY) {
+                _key = self.nodes[_key].left;
+            }
+        }
+    }
+    function last(Index storage self) internal view returns (uint _key) {
+        _key = self.root;
+        if (_key != EMPTY) {
+            while (self.nodes[_key].right != EMPTY) {
+                _key = self.nodes[_key].right;
+            }
+        }
+    }
+    function next(Index storage self, uint target) internal view returns (uint cursor) {
+        if(target != EMPTY) {
+            if (self.nodes[target].right != EMPTY) {
+                cursor = treeMinimum(self, self.nodes[target].right);
+            } else {
+                cursor = self.nodes[target].parent;
+                while (cursor != EMPTY && target == self.nodes[cursor].right) {
+                    target = cursor;
+                    cursor = self.nodes[cursor].parent;
+                }
+            }
+        }
+    }
+    function prev(Index storage self, uint target) internal view returns (uint cursor) {
+        if(target != EMPTY) {
+            if (self.nodes[target].left != EMPTY) {
+                cursor = treeMaximum(self, self.nodes[target].left);
+            } else {
+                cursor = self.nodes[target].parent;
+                while (cursor != EMPTY && target == self.nodes[cursor].left) {
+                    target = cursor;
+                    cursor = self.nodes[cursor].parent;
+                }
+            }
+        }
+    }
+    function contains(Index storage self, uint key) internal view returns (bool) {
+        return (key != EMPTY) && ((key == self.root) || (self.nodes[key].parent != EMPTY));
+    }
+    function add(Index storage self, uint key) internal returns (bool) {
+        if(key == EMPTY)
+            return false;
+        if(contains(self, key))
+            return false;
+        uint cursor = EMPTY;
+        uint probe = self.root;
+        while (probe != EMPTY) {
+            cursor = probe;
+            if (key < probe) {
+                probe = self.nodes[probe].left;
+            } else {
+                probe = self.nodes[probe].right;
+            }
+        }
+        self.nodes[key] = Node({parent: cursor, left: EMPTY, right: EMPTY, red: true});
+        if (cursor == EMPTY) {
+            self.root = key;
+        } else if (key < cursor) {
+            self.nodes[cursor].left = key;
+        } else {
+            self.nodes[cursor].right = key;
+        }
+        insertFixup(self, key);
+        return true;
+    }
+    function remove(Index storage self, uint key) internal returns (bool) {
+        if(key == EMPTY)
+            return false;
+        if(!contains(self, key))
+            return false;
+        uint probe;
+        uint cursor;
+        if (self.nodes[key].left == EMPTY || self.nodes[key].right == EMPTY) {
+            cursor = key;
+        } else {
+            cursor = self.nodes[key].right;
+            while (self.nodes[cursor].left != EMPTY) {
+                cursor = self.nodes[cursor].left;
+            }
+        }
+        if (self.nodes[cursor].left != EMPTY) {
+            probe = self.nodes[cursor].left;
+        } else {
+            probe = self.nodes[cursor].right;
+        }
+        uint yParent = self.nodes[cursor].parent;
+        self.nodes[probe].parent = yParent;
+        if (yParent != EMPTY) {
+            if (cursor == self.nodes[yParent].left) {
+                self.nodes[yParent].left = probe;
+            } else {
+                self.nodes[yParent].right = probe;
+            }
+        } else {
+            self.root = probe;
+        }
+        bool doFixup = !self.nodes[cursor].red;
+        if (cursor != key) {
+            replaceParent(self, cursor, key);
+            self.nodes[cursor].left = self.nodes[key].left;
+            self.nodes[self.nodes[cursor].left].parent = cursor;
+            self.nodes[cursor].right = self.nodes[key].right;
+            self.nodes[self.nodes[cursor].right].parent = cursor;
+            self.nodes[cursor].red = self.nodes[key].red;
+            (cursor, key) = (key, cursor);
+        }
+        if (doFixup) {
+            removeFixup(self, probe);
+        }
+        delete self.nodes[cursor];
+        return true;
+    }
+
+    function treeMinimum(Index storage self, uint key) private view returns (uint) {
+        while (self.nodes[key].left != EMPTY) {
+            key = self.nodes[key].left;
+        }
+        return key;
+    }
+    function treeMaximum(Index storage self, uint key) private view returns (uint) {
+        while (self.nodes[key].right != EMPTY) {
+            key = self.nodes[key].right;
+        }
+        return key;
+    }
+
+    function rotateLeft(Index storage self, uint key) private {
+        uint cursor = self.nodes[key].right;
+        uint keyParent = self.nodes[key].parent;
+        uint cursorLeft = self.nodes[cursor].left;
+        self.nodes[key].right = cursorLeft;
+        if (cursorLeft != EMPTY) {
+            self.nodes[cursorLeft].parent = key;
+        }
+        self.nodes[cursor].parent = keyParent;
+        if (keyParent == EMPTY) {
+            self.root = cursor;
+        } else if (key == self.nodes[keyParent].left) {
+            self.nodes[keyParent].left = cursor;
+        } else {
+            self.nodes[keyParent].right = cursor;
+        }
+        self.nodes[cursor].left = key;
+        self.nodes[key].parent = cursor;
+    }
+    function rotateRight(Index storage self, uint key) private {
+        uint cursor = self.nodes[key].left;
+        uint keyParent = self.nodes[key].parent;
+        uint cursorRight = self.nodes[cursor].right;
+        self.nodes[key].left = cursorRight;
+        if (cursorRight != EMPTY) {
+            self.nodes[cursorRight].parent = key;
+        }
+        self.nodes[cursor].parent = keyParent;
+        if (keyParent == EMPTY) {
+            self.root = cursor;
+        } else if (key == self.nodes[keyParent].right) {
+            self.nodes[keyParent].right = cursor;
+        } else {
+            self.nodes[keyParent].left = cursor;
+        }
+        self.nodes[cursor].right = key;
+        self.nodes[key].parent = cursor;
+    }
+
+    function insertFixup(Index storage self, uint key) private {
+        uint cursor;
+        while (key != self.root && self.nodes[self.nodes[key].parent].red) {
+            uint keyParent = self.nodes[key].parent;
+            if (keyParent == self.nodes[self.nodes[keyParent].parent].left) {
+                cursor = self.nodes[self.nodes[keyParent].parent].right;
+                if (self.nodes[cursor].red) {
+                    self.nodes[keyParent].red = false;
+                    self.nodes[cursor].red = false;
+                    self.nodes[self.nodes[keyParent].parent].red = true;
+                    key = self.nodes[keyParent].parent;
+                } else {
+                    if (key == self.nodes[keyParent].right) {
+                      key = keyParent;
+                      rotateLeft(self, key);
+                    }
+                    keyParent = self.nodes[key].parent;
+                    self.nodes[keyParent].red = false;
+                    self.nodes[self.nodes[keyParent].parent].red = true;
+                    rotateRight(self, self.nodes[keyParent].parent);
+                }
+            } else {
+                cursor = self.nodes[self.nodes[keyParent].parent].left;
+                if (self.nodes[cursor].red) {
+                    self.nodes[keyParent].red = false;
+                    self.nodes[cursor].red = false;
+                    self.nodes[self.nodes[keyParent].parent].red = true;
+                    key = self.nodes[keyParent].parent;
+                } else {
+                    if (key == self.nodes[keyParent].left) {
+                      key = keyParent;
+                      rotateRight(self, key);
+                    }
+                    keyParent = self.nodes[key].parent;
+                    self.nodes[keyParent].red = false;
+                    self.nodes[self.nodes[keyParent].parent].red = true;
+                    rotateLeft(self, self.nodes[keyParent].parent);
+                }
+            }
+        }
+        self.nodes[self.root].red = false;
+    }
+
+    function replaceParent(Index storage self, uint a, uint b) private {
+        uint bParent = self.nodes[b].parent;
+        self.nodes[a].parent = bParent;
+        if (bParent == EMPTY) {
+            self.root = a;
+        } else {
+            if (b == self.nodes[bParent].left) {
+                self.nodes[bParent].left = a;
+            } else {
+                self.nodes[bParent].right = a;
+            }
+        }
+    }
+    function removeFixup(Index storage self, uint key) private {
+        uint cursor;
+        while (key != self.root && !self.nodes[key].red) {
+            uint keyParent = self.nodes[key].parent;
+            if (key == self.nodes[keyParent].left) {
+                cursor = self.nodes[keyParent].right;
+                if (self.nodes[cursor].red) {
+                    self.nodes[cursor].red = false;
+                    self.nodes[keyParent].red = true;
+                    rotateLeft(self, keyParent);
+                    cursor = self.nodes[keyParent].right;
+                }
+                if (!self.nodes[self.nodes[cursor].left].red && !self.nodes[self.nodes[cursor].right].red) {
+                    self.nodes[cursor].red = true;
+                    key = keyParent;
+                } else {
+                    if (!self.nodes[self.nodes[cursor].right].red) {
+                        self.nodes[self.nodes[cursor].left].red = false;
+                        self.nodes[cursor].red = true;
+                        rotateRight(self, cursor);
+                        cursor = self.nodes[keyParent].right;
+                    }
+                    self.nodes[cursor].red = self.nodes[keyParent].red;
+                    self.nodes[keyParent].red = false;
+                    self.nodes[self.nodes[cursor].right].red = false;
+                    rotateLeft(self, keyParent);
+                    key = self.root;
+                }
+            } else {
+                cursor = self.nodes[keyParent].left;
+                if (self.nodes[cursor].red) {
+                    self.nodes[cursor].red = false;
+                    self.nodes[keyParent].red = true;
+                    rotateRight(self, keyParent);
+                    cursor = self.nodes[keyParent].left;
+                }
+                if (!self.nodes[self.nodes[cursor].right].red && !self.nodes[self.nodes[cursor].left].red) {
+                    self.nodes[cursor].red = true;
+                    key = keyParent;
+                } else {
+                    if (!self.nodes[self.nodes[cursor].left].red) {
+                        self.nodes[self.nodes[cursor].right].red = false;
+                        self.nodes[cursor].red = true;
+                        rotateLeft(self, cursor);
+                        cursor = self.nodes[keyParent].left;
+                    }
+                    self.nodes[cursor].red = self.nodes[keyParent].red;
+                    self.nodes[keyParent].red = false;
+                    self.nodes[self.nodes[cursor].left].red = false;
+                    rotateRight(self, keyParent);
+                    key = self.root;
+                }
+            }
+        }
+        self.nodes[key].red = false;
+    }
+}
+
 
 // import "hardhat/console.sol";
 
@@ -77,9 +597,9 @@ library leaders {
         uint points_before = self.points_storage[leader];
         if(points_before > 0) {
             // remove the leader from the index
-            <%- assert('self.points_index.contains(points_before)') %>
+            assert(self.points_index.contains(points_before));
             uint_set.Set storage leaders_before = self.leaders_storage[points_before];
-            <%- assert('leaders_before.contains(leader)') %>
+            assert(leaders_before.contains(leader));
             leaders_before.remove(leader);
             if(leaders_before.length() == 0) {
                 delete self.leaders_storage[points_before];
@@ -97,7 +617,7 @@ library leaders {
         // add the leader to the index
         if(points_after > 0) {
             uint_set.Set storage leaders_after = self.leaders_storage[points_after];
-            <%- assert('!leaders_after.contains(leader)') %>
+            assert(!leaders_after.contains(leader));
             leaders_after.add(leader);
             self.points_index.add(points_after);
         } else {
@@ -143,14 +663,14 @@ library leaders {
         uint total;
         for(uint i=self.points_index.first(); i != 0; i=self.points_index.next(i)) {
             uint256[] storage l = self.leaders_storage[i].values;
-            <%- assert('l.length > 0') %>
+            assert(l.length > 0);
             for(uint j=0; j < l.length; j++) {
                 uint256 leader=l[j];
-                <%- assert('self.points_storage[leader] == i') %>
+                assert(self.points_storage[leader] == i);
                 total += i;
             }
         }
-        <%- assert('total == self.total_points') %>
+        assert(total == self.total_points);
         return true;
     }
 }
@@ -841,7 +1361,7 @@ contract Offer {
             address contributor = _contributors.at(i);
             uint count_voting = _contributors_leaders.votings[contributor];
             uint fund_voting = _contributors_fund_leaders.votings[contributor];
-            <%- assert('count_voting == fund_voting') %>
+            assert(count_voting == fund_voting);
         }
     }
 }

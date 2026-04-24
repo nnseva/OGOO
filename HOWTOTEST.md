@@ -7,6 +7,7 @@
 - [Offer Definition](OfferDefinition.md)
 - [Offer Contract API](OfferContractAPI.md)
 - [How To Test](HOWTOTEST.md) ⏴ *this page*
+- [User Guide](html/USER-GUIDE.en.md) [ru](html/USER-GUIDE.ru.md)
 
 ## Install a Wallet
 
@@ -95,13 +96,132 @@ For testing, you can use any of the listed accounts. They are pre-funded with te
 
 **Note:** The HardHat node resets its blockchain state every time it restarts. All accounts and contracts will be reset.
 
-### Configure Your MetaMask Wallet
+## Go to the Site
 
-You need to connect MetaMask to your local test network.
+The published version is available on the [OGOO site](https://ogoo.io).
 
-#### Connect MetaMask to the Local HardHat Network
+A non-published version should be tested on *your own* site deployment.
 
-To connect MetaMask to your local HardHat network:
+### Local HTTP server deployment
+
+You can use Apache or Nginx to create your own site on the localhost. This site is totally static.
+
+#### Apache2 software configuration
+
+Install the Apache2 software if necessary.
+
+The following config allowes to deploy a site locally using your `/home/<username>/OGOO` directory on the Linux (or MacOS) host with the Apache2 server (**notice** that the directory structure may differ on Linux and MacOS hosts, here is a Linux configuration example).
+
+`/etc/apache2/sites-available/003-ogoo.conf`
+```
+<VirtualHost *:80>
+        ServerName ogoo.local
+
+        ServerAdmin webmaster@localhost
+
+        # Here should be an actual path to the OGOO/html subdirectory
+        DocumentRoot /home/<username>/OGOO/html
+
+        ErrorLog ${APACHE_LOG_DIR}/ogoo-error.log
+        CustomLog ${APACHE_LOG_DIR}/ogoo-access.log combined
+</VirtualHost>
+
+# Use the same actual path to the OGOO/html subdirectory
+<Directory /home/<username>/OGOO/html>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+</Directory>
+```
+
+Activate the site:
+```bash
+a2ensite 003-ogoo.conf
+```
+
+Reload the apache2 server:
+
+```bash
+systemctl reload apache2
+```
+
+You also need to have the `ogoo.local` hostname resolved. Add the following
+row into your `/etc/hosts` file:
+
+```
+127.0.0.1 ogoo.local
+```
+
+### Local site preparation
+
+Use `git` to clone the source of the package
+
+```bash
+# go to the home directory
+cd
+# clone the repository
+git clone git@github.com:nnseva/OGOO.git
+cd OGOO
+# use the necessary branch
+git checkout "<name-of-the-branch>"
+```
+
+Use `Node.js` to prepare a site.
+
+```bash
+
+npm install
+npx solt pp templates/ogoo.solt -o contracts/ogoo.sol
+npx hardhat compile
+```
+
+### Browser hack for the local site
+
+The local site is HTTP, not HTTPS. The modern browsers forbid using the camera on the HTTP site. The OGOO site may use the camera to scan QR codes with accounts.
+
+You can hack the Chromium (probably the Chrome also) browser to allow using the camera on a selected set of HTTP sites.
+
+Use the following URL:
+
+[chrome://flags/#unsafely-treat-insecure-origin-as-secure](chrome://flags/#unsafely-treat-insecure-origin-as-secure)
+
+Enable the feature.
+
+Input `http://ogoo.local` into the input field.
+
+## Open the site
+
+Open the `http://ogoo.local` if you use a local site. The public site is `https://ogoo.io`.
+
+The site will prompt you to connect your MetaMask wallet. Follow the instructions.
+
+If everything is set up correctly, you will see your account number and ETH balance displayed under the site’s top menu. The wallet selector in the top right corner should show the MetaMask icon and name.
+
+### Modern MetaMask testing network connection
+
+On the modern versions of the MetaMask you will need to add and select the testing Ethereum network for the particular site (`ogoo.io` or `ogoo.local`).
+
+Open the `https://ogoo.io` or `http://ogoo.local` site, and connect the MetaMask wallet if not yet. Open the MetaMask plugin and click the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
+
+You will see the site name (`ogoo.io` or `ogoo.local`) and an active (blue) link to the network directly below. Click this link.
+
+You will see the "Network Management" list where all available networks are listed. The "Add Custom Network" button
+should be present below the list. Click it if you don't see your custom network in a list yet, and input the
+following values into the input fields:
+
+    - **Network Name:** HardHat Localhost
+    - **New RPC URL:** http://127.0.0.1:8545/
+    - **Chain ID:** 31337
+    - **Currency Symbol:** ETH
+    - **Block Explorer URL:** (leave blank)
+
+Ensure that the "HardHat Localhost" is an active element in the list.
+
+You also may need to select the `HardHat Localhost` network in the `Tokens` list. 
+
+### Older MetaMask testing network connection
+
+On the older versions of the MetaMask you will need to add and select the testing Ethereum network for all sites.
 
 1. Open MetaMask and click the network dropdown at the top.
 2. Select **Add network** (or **Add network manually**).
@@ -131,15 +251,8 @@ The test account will now appear in your MetaMask wallet, and you can use its pr
 Make sure to select the _test network_ as your current network, and your _test account_ as your current account (dropdown at the top center of MetaMask). You should see your test account pre-funded with 10000 ETH. If the balance does not appear immediately, try switching networks in MetaMask.
 
 - In the oldest versions of MetaMask, the _network_ is switched globally using dropdown in the top left corner of MetaMask
-- In the modern versions of MetaMask, the _network_ is switched individually for the application, clicking the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
-
-## Go to the Site
-
-Open the [OGOO site](https://ogoo.io).
-
-The site will prompt you to connect your MetaMask wallet. Follow the instructions.
-
-If everything is set up correctly, you will see your account number and ETH balance displayed under the site’s top menu. The wallet selector in the top right corner should show the MetaMask icon and name.
+- In the modern versions of MetaMask, the _network_ is switched **individually** for the application, clicking the _application icon_ to the left of the menu switch in the top right corner of MetaMask.
+- You also may need to select the `HardHat Localhost` network in the `Tokens` list. 
 
 ## Offer Operations
 
@@ -157,21 +270,21 @@ On the offer editing page, add observers to your offer. You can use any pre-fund
 
 ### Approving the Offer
 
-Go to the Managed Offers list via the **Managed Offers** - **List of Managed Offers** menu. Approve the offer by clicking the **Approve** button next to it.
+Go to the Managed Offers list via the **Managed Offers** - **Managed by Me** menu. Approve the offer by clicking the **Approve** button.
 
 ### Checking Offer Status
 
-Click the offer link in any offer list to view its current status.
+Click the offer link (on the offer's address line) in any offer list to view its current status.
 
 ### Contributing to the Offer
 
-Open the general offers list from the **Offers** - **Offers List** menu. Click the **Contribute** button and enter the amount you wish to contribute. You can view your contributions in the **Contributions** - **Contributions List** menu.
+Open the general offers list from the **Offers** - **All Offers** menu. Click the **Contribute** button and enter the amount you wish to contribute. You can view your contributions in the **Contributions** - **My Contributions** menu.
 
 Try contributing from multiple accounts.
 
 ### Voting as a Contributor
 
-Go to the contributions list via the **Contributions** - **Contributions List** menu. Click the **Vote** button and enter a contender’s address. You can use your camera to scan the Ethereum address. To vote for failure, use the **Failure** button (red slashed circle).
+Go to the contributions list via the **Contributions** - **My Contributions** menu. Click the **Vote** button and enter a contender’s address. You can use your camera to scan the Ethereum address. To vote for failure, use the **Failure** button (red slashed circle).
 
 You may vote multiple times.
 
@@ -200,4 +313,3 @@ Either delete all test accounts or, for each test account:
 1. Select the test network and the account in MetaMask.
 2. Go to the Activity tab for the account. If there are any actions listed, they should be cleared.
 3. Use the **Settings** - **Advanced** - **Clear Activity** option in MetaMask (found in the top right menu).
-
